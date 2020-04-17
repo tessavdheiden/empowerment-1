@@ -74,8 +74,28 @@ def product(p_x, p_y):
     assert Pxy.shape == (p_y.shape[0], p_x.shape[1]) 
     return Pxy
 
-def blahut_arimoto(P_yx, epsilon = 0.001, deterministic = False):
-    """ 
+def blahut_arimoto_batched(P_yx, q_x, epsilon = 0.001):
+    P_yx = P_yx + eps
+    T = np.ones((P_yx.shape[0]))
+    while any(T>epsilon):
+        # update PHI
+        PHI_yx_num = P_yx*np.expand_dims(q_x, axis=0)
+        PHI_yx_den = np.expand_dims((P_yx * np.expand_dims(q_x, axis=0)).sum(axis=1), axis=1)
+        PHI_yx = PHI_yx_num / PHI_yx_den
+        inner = (P_yx[:, :, None]*log2(PHI_yx[:, :, None])).squeeze(2)
+        r_x = np.exp(np.sum(inner, axis=0))
+        # channel capactiy
+        C = log2(np.sum(r_x, axis=0))
+        # check convergence
+        T = np.max(log2(r_x/q_x), axis=0) - C
+        # update q
+        q_x = (r_x + eps)
+        q_x /= q_x.sum(axis=0)
+    C[C < 0] = 0
+    return C
+
+def blahut_arimoto(P_yx, q_x, epsilon = 0.001, deterministic = False):
+    """
     Compute the channel capacity C of a channel p(y|x) using the Blahut-Arimoto algorithm. To do
     this, finds the input distribution p(x) that maximises the mutual information I(X;Y)
     determined by p(y|x) and p(x).
@@ -85,8 +105,6 @@ def blahut_arimoto(P_yx, epsilon = 0.001, deterministic = False):
     """
     P_yx = P_yx + eps
     if not deterministic:
-        # initialize input dist randomly 
-        q_x = _rand_dist((P_yx.shape[1],))
         T = 1
         while T > epsilon:
             # update PHI
@@ -94,7 +112,7 @@ def blahut_arimoto(P_yx, epsilon = 0.001, deterministic = False):
             r_x = np.exp(np.sum(P_yx*log2(PHI_yx), axis=0))
             # channel capactiy 
             C = log2(np.sum(r_x))
-            # check convergence 
+            # check convergence
             T = np.max(log2(r_x/q_x)) - C
             # update q
             q_x = _normalize(r_x + eps)

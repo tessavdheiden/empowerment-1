@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt 
 import itertools
-from info_theory import blahut_arimoto
+from info_theory import blahut_arimoto_batched
 from functools import reduce
 from empowerment import empowerment    
 
@@ -135,7 +135,7 @@ class MazeWorld(object):
         self.T = T
         return T 
 
-    def empowerment(self, n_step, n_samples = 5000, det = 1.):
+    def empowerment(self, n_step, n_samples = 5000, det = 1., batched=False):
         """ 
         Computes the empowerment of each cell and returns as array. 
 
@@ -148,11 +148,25 @@ class MazeWorld(object):
         """
         T = self.compute_model()
         E = np.zeros(self.dims)
-        for y in range(self.dims[0]):
-            for x in range(self.dims[1]):
-                s = self._cell_to_index((y,x))
-                E[y,x] = empowerment(T=T, det = (det == 1.), n_step = n_step, state=s, n_samples=n_samples)
-        return E
+        n_actions = len(self.actions)
+        if batched:
+            n_states = self.dims[0] * self.dims[1]
+            nstep_actions = list(itertools.product(range(n_actions), repeat = n_step))
+
+            Bn = np.zeros([n_states, len(nstep_actions), n_states])
+            for i, an in enumerate(nstep_actions):
+                Bn[:, i , :] = reduce((lambda x, y : np.dot(y, x)), map((lambda a : T[:,a,:]), an))
+
+            q_x = np.repeat(np.expand_dims(np.random.rand(len(nstep_actions)), axis=1), n_states, axis=1)
+            q_x /= q_x.sum(axis=0)
+            E = blahut_arimoto_batched(Bn, q_x)
+            return E.reshape(self.dims)
+        else:
+            for y in range(self.dims[0]):
+                for x in range(self.dims[1]):
+                    s = self._cell_to_index((y,x))
+                    E[y,x] = empowerment(T=T, det = (det == 1.), n_step = n_step, state=s, n_samples=n_samples)
+            return E
 
 def klyubin_world():
     """ Build mazeworld from Klyubin et al. """

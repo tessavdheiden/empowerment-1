@@ -6,7 +6,7 @@ describing the probabilistic dynamics of an environment.
 import numpy as np 
 from functools import reduce
 import itertools
-from info_theory import blahut_arimoto
+from info_theory import blahut_arimoto, _rand_dist
 import random
 
 def rand_sample(p_x):
@@ -66,9 +66,10 @@ def empowerment(T, det, n_step, state, n_samples=1000, epsilon = 1e-6):
     else:
         nstep_actions = list(itertools.product(range(n_actions), repeat = n_step))
         Bn = np.zeros([n_states, len(nstep_actions), n_states])
+        q_x = _rand_dist((Bn.shape[1],))
         for i, an in enumerate(nstep_actions):
             Bn[:, i , :] = reduce((lambda x, y : np.dot(y, x)), map((lambda a : T[:,a,:]), an))
-        return blahut_arimoto(Bn[:,:,state], epsilon=epsilon)
+        return blahut_arimoto(Bn[:,:,state], q_x, epsilon=epsilon)
 
 class EmpMaxAgent:
     """ 
