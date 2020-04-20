@@ -1,9 +1,6 @@
 import numpy as np
-import matplotlib.pyplot as plt 
-import itertools
-from info_theory import blahut_arimoto_batched
-from functools import reduce
-from empowerment import empowerment    
+import matplotlib.pyplot as plt
+from empowerment import Empowerment, optimize_batch_numerically, Algorithm
 
 class MazeWorld(object):
     """ Represents an n x m grid world with walls at various locations. Actions can be performed (N, S, E, W, "stay") moving a player around the grid world. You can't move through walls. """
@@ -133,11 +130,11 @@ class MazeWorld(object):
                 for su in s_unc:
                     T[su, i, s] += (1-det)/(len(s_unc))
         self.T = T
-        return T 
+        return T
 
-    def empowerment(self, n_step, n_samples = 5000, det = 1., batched=False):
+    def empowerment(self, n_step, n_samples = 5000, det = 1., batched=True):
         """ 
-        Computes the empowerment of each cell and returns as array. 
+        Computes the empowerment of all cells and returns as array.
 
         n_step : int
             Determines the "time horizon" of the empowerment computation. The computed empowerment is the influence the agent has on the future over an n_step time horizon.
@@ -147,25 +144,15 @@ class MazeWorld(object):
             Probability of action successfully performed (otherwise a random different action is performed with probability 1 - det). When det = 1 the dynamics are deterministic. 
         """
         T = self.compute_model()
-        E = np.zeros(self.dims)
-        n_actions = len(self.actions)
         if batched:
-            n_states = self.dims[0] * self.dims[1]
-            nstep_actions = list(itertools.product(range(n_actions), repeat = n_step))
-
-            Bn = np.zeros([n_states, len(nstep_actions), n_states])
-            for i, an in enumerate(nstep_actions):
-                Bn[:, i , :] = reduce((lambda x, y : np.dot(y, x)), map((lambda a : T[:,a,:]), an))
-
-            q_x = np.repeat(np.expand_dims(np.random.rand(len(nstep_actions)), axis=1), n_states, axis=1)
-            q_x /= q_x.sum(axis=0)
-            E = blahut_arimoto_batched(Bn, q_x)
-            return E.reshape(self.dims)
+            return optimize_batch_numerically(T=T, n_step = n_step).reshape(self.dims)
         else:
+            empowerment = Empowerment(Algorithm.Blahut) if det == 1. else Empowerment(Algorithm.VisitCount)
+            E = np.zeros(self.dims)
             for y in range(self.dims[0]):
                 for x in range(self.dims[1]):
                     s = self._cell_to_index((y,x))
-                    E[y,x] = empowerment(T=T, det = (det == 1.), n_step = n_step, state=s, n_samples=n_samples)
+                    E[y,x] = empowerment.compute(T=T, n_step = n_step, state=s, n_samples=n_samples)
             return E
 
 def klyubin_world():

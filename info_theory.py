@@ -74,10 +74,19 @@ def product(p_x, p_y):
     assert Pxy.shape == (p_y.shape[0], p_x.shape[1]) 
     return Pxy
 
-def blahut_arimoto_batched(P_yx, q_x, epsilon = 0.001):
+def blahut_arimoto_batched(P_yx, q_x, epsilon = 0.001, iters = 20):
+    """
+    Compute the channel capacity C of a channel p(y|x) using the Blahut-Arimoto algorithm. To do
+    this, finds the input distribution p(x) that maximises the mutual information I(X;Y)
+    determined by p(y|x) and p(x).
+
+    P_yx : defines the channel p(y|x)
+    iters : number of iterations
+    """
     P_yx = P_yx + eps
     T = np.ones((P_yx.shape[0]))
-    while any(T>epsilon):
+    i = 0
+    while any(T > epsilon) and i < iters:
         # update PHI
         PHI_yx_num = P_yx*np.expand_dims(q_x, axis=0)
         PHI_yx_den = np.expand_dims((P_yx * np.expand_dims(q_x, axis=0)).sum(axis=1), axis=1)
@@ -91,10 +100,11 @@ def blahut_arimoto_batched(P_yx, q_x, epsilon = 0.001):
         # update q
         q_x = (r_x + eps)
         q_x /= q_x.sum(axis=0)
+        i+=1
     C[C < 0] = 0
     return C
 
-def blahut_arimoto(P_yx, q_x, epsilon = 0.001, deterministic = False):
+def blahut_arimoto(P_yx, q_x, epsilon = 0.001, deterministic = False, iters = 20):
     """
     Compute the channel capacity C of a channel p(y|x) using the Blahut-Arimoto algorithm. To do
     this, finds the input distribution p(x) that maximises the mutual information I(X;Y)
@@ -106,7 +116,8 @@ def blahut_arimoto(P_yx, q_x, epsilon = 0.001, deterministic = False):
     P_yx = P_yx + eps
     if not deterministic:
         T = 1
-        while T > epsilon:
+        i = 0
+        while T > epsilon and i < iters:
             # update PHI
             PHI_yx = (P_yx*q_x.reshape(1,-1))/(P_yx @ q_x).reshape(-1,1)
             r_x = np.exp(np.sum(P_yx*log2(PHI_yx), axis=0))
@@ -116,6 +127,7 @@ def blahut_arimoto(P_yx, q_x, epsilon = 0.001, deterministic = False):
             T = np.max(log2(r_x/q_x)) - C
             # update q
             q_x = _normalize(r_x + eps)
+            i+=1
         if C < 0:
             C = 0
         return C

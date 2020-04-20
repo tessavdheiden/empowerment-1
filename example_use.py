@@ -1,6 +1,7 @@
 import mazeworld
-from mazeworld import MazeWorld
-from empowerment import empowerment, EmpMaxAgent
+from mazeworld import MazeWorld, klyubin_world
+from pendulum import Pendulum
+from empowerment import EmpMaxAgent
 import numpy as np 
 import matplotlib.pyplot as plt
 import time 
@@ -25,7 +26,7 @@ def example_1():
     maze.add_wall( (7, 4), "N")
     maze.add_wall( (8, 4), "W")
     maze.add_wall( (8, 3), "N")
-    # compute the 5-step empowerment at each cell 
+    # compute the 5-step empowerment at each cell
     E = maze.empowerment(n_step=5)
     # plot the maze world
     maze.plot(colorMap=E)
@@ -62,13 +63,13 @@ def example_3():
     E = maze.empowerment(n_step = n_step).reshape(-1)
     n_s, n_a, _ = T.shape
     agent = EmpMaxAgent(alpha=0.1, gamma=0.9, T = T, n_step=n_step, n_samples=1000, det=1.)
-    steps = int(10000) 
+    steps = int(10000)
     visited = np.zeros(maze.dims)
     tau = np.zeros(steps)
     D_emp = np.zeros(steps)
     D_mod = n_s*n_a*np.ones(steps)
     for t in range(steps):
-        # append data for plotting 
+        # append data for plotting
         tau[t] = agent.tau
         D_emp[t] = np.mean((E - agent.E)**2)
         D_mod[t] = D_mod[t] - np.sum(np.argmax(agent.T, axis=0) == np.argmax(B, axis=0))
@@ -80,9 +81,13 @@ def example_3():
         s = s_
     print("elapsed seconds: %0.3f" % (time.time() - start) )
     plt.figure(1)
-    plt.title("value map")
-    Vmap = np.max(agent.Q, axis=1).reshape(*maze.dims)
+    plt.title("value and action map")
+    Vmap = agent.value_map.reshape(*maze.dims)
     maze.plot(colorMap= Vmap )
+    Amap = agent.action_map
+    U = np.array([(1 if a == 2 else (-1 if a == 3 else 0)) for a in Amap]).reshape(maze.height, maze.width)
+    V = np.array([(1 if a == 0 else (-1 if a == 1 else 0)) for a in Amap]).reshape(maze.height, maze.width)
+    plt.quiver(np.arange(maze.width) + .5, np.arange(maze.height) + .5, U, V)
     plt.figure(2)
     plt.title("subjective empowerment")
     maze.plot(colorMap= agent.E.reshape(*maze.dims))
@@ -102,14 +107,27 @@ def example_3():
     ax1.set_ylabel('MSE of empowerment map', color=red)
     ax1.plot(D_emp, color=red)
     ax1.tick_params(axis='y', labelcolor=red)
-    ax2 = ax1.twinx()  
-    ax2.set_ylabel('Model disagreement', color='tab:blue')  
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Model disagreement', color='tab:blue')
     ax2.plot(D_mod, color='tab:blue')
     ax2.tick_params(axis='y', labelcolor='tab:blue')
     plt.show()
 
+def example_4():
+    """ builds maze world from original empowerment paper(https://uhra.herts.ac.uk/bitstream/handle/2299/1918/901933.pdf?sequence=1) and plots empowerment landscape.
+    """
+    pendulum = Pendulum(9,15)
+    # compute the 5-step empowerment at each cell
+    E = pendulum.empowerment(n_step=5, det=1.)
+    # plot the maze world
+    pendulum.plot(colorMap=E)
+    plt.title('5-step empowerment')
+    plt.show()
+
+
 if __name__ == "__main__":
     ## uncomment below to see examples 
-    example_1()
+    # example_1()
     # example_2()
-    # example_3()
+    example_3()
+    # example_4()
