@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from empowerment import Empowerment, optimize_batch_numerically, Algorithm
+from empowerment import Empowerment, EmpowermentBatched
 
 class MazeWorld(object):
     """ Represents an n x m grid world with walls at various locations. Actions can be performed (N, S, E, W, "stay") moving a player around the grid world. You can't move through walls. """
@@ -145,9 +145,10 @@ class MazeWorld(object):
         """
         T = self.compute_model()
         if batched:
-            return optimize_batch_numerically(T=T, n_step = n_step).reshape(self.dims)
+            empowerment = EmpowermentBatched(deterministic = (det == 1))
+            return empowerment.compute(T=T, n_step = n_step).reshape(self.dims)
         else:
-            empowerment = Empowerment(Algorithm.Blahut) if det == 1. else Empowerment(Algorithm.VisitCount)
+            empowerment = Empowerment(deterministic = (det == 1))
             E = np.zeros(self.dims)
             for y in range(self.dims[0]):
                 for x in range(self.dims[1]):

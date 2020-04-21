@@ -7,6 +7,7 @@ import numpy as np
 from functools import reduce
 import itertools
 from info_theory import blahut_arimoto, _rand_dist, blahut_arimoto_batched
+from variational_empowerment import VariationalEmpowerment
 import enum
 
 def rand_sample(p_x):
@@ -29,17 +30,11 @@ def softmax(x, tau):
     """
     return normalize(np.exp(x / tau))
 
-
-class Algorithm(enum.Enum):
-    VisitCount = 1
-    Blahut = 2
-
-
 class Empowerment(object):
-    def __init__(self, algorithm: Algorithm):
-        if algorithm == Algorithm.VisitCount:
+    def __init__(self, deterministic: bool):
+        if deterministic:
             self.method = count_visited_states
-        if algorithm == Algorithm.Blahut:
+        else:
             self.method = optimize_numerically
 
     def compute(self, T, n_step, state, n_samples=1000, epsilon=1e-6):
@@ -92,7 +87,18 @@ def optimize_numerically(T, n_step, state, n_samples=1000, epsilon=1e-6):
     return blahut_arimoto(Bn[:, :, state], q_x, epsilon=epsilon)
 
 
-def optimize_batch_numerically(T, n_step, epsilon=1e-6):
+class EmpowermentBatched(object):
+    def __init__(self, deterministic: bool):
+        if deterministic:
+            self.method = count_batch_visited_states
+        else:
+            self.method = optimize_batch_numerically
+
+    def compute(self, T, n_step, n_samples=1000, epsilon=1e-6):
+        return self.method(T, n_step, n_samples, epsilon)
+
+
+def optimize_batch_numerically(T, n_step, n_samples=1000, epsilon=1e-6):
     """
     Compute the empowerment of a state in a grid world
     T : numpy array, shape (n_states, n_actions, n_states)
@@ -116,6 +122,22 @@ def optimize_batch_numerically(T, n_step, epsilon=1e-6):
 
     q_x = normalize(np.repeat(np.expand_dims(q_x, axis=1), n_states, axis=1))
     return blahut_arimoto_batched(Bn, q_x, epsilon=epsilon)
+
+
+def count_batch_visited_states(T, n_step, n_samples=1000, epsilon=1e-6):
+    n_states, n_actions, _  = T.shape
+    # only sample if too many actions sequences to iterate through
+    if n_actions**n_step < 5000:
+        nstep_actions = np.array(list(itertools.product(range(n_actions), repeat = n_step)))
+    else:
+        nstep_actions = np.random.randint(0,n_actions, [n_samples,n_step])
+    Bn = np.zeros([n_states, len(nstep_actions), n_states])
+    for i, an in enumerate(nstep_actions):
+        Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))
+    # fold over each nstep actions, get unique end states
+    seen = map(lambda x: np.unique(x), np.argmax(Bn[:, :, :], axis=0).T)
+    return np.fromiter(map(lambda x: np.log2(len(x)), seen), dtype=np.float)
+
 
 class EmpMaxAgent:
     """ 
