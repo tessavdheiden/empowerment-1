@@ -37,11 +37,11 @@ class Empowerment(object):
         else:
             self.method = optimize_numerically
 
-    def compute(self, T, n_step, state, n_samples=1000, epsilon=1e-6):
-        return self.method(T, n_step, state, n_samples, epsilon)
+    def compute(self, T, n_step, state):
+        return self.method(T, n_step, state)
 
 
-def count_visited_states(T, n_step, state, n_samples=1000, epsilon=1e-6):
+def count_visited_states(T, n_step, state, epsilon=1e-6):
     n_states, n_actions, _  = T.shape
     # only sample if too many actions sequences to iterate through
     if n_actions**n_step < 5000:
@@ -58,7 +58,7 @@ def count_visited_states(T, n_step, state, n_samples=1000, epsilon=1e-6):
     return np.log2(len(seen))
 
 
-def optimize_numerically(T, n_step, state, n_samples=1000, epsilon=1e-6):
+def optimize_numerically(T, n_step, state, n_samples=1000):
     """
     Compute the empowerment of a state in a grid world
     T : numpy array, shape (n_states, n_actions, n_states)
