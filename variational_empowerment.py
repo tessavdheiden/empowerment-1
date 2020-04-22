@@ -3,13 +3,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
+from functools import reduce
+import itertools
 
 
 class Source(nn.Module):
-    categorical_dim = 5
-    def __init__(self, input_dim):
+    def __init__(self, input_dim, categorical_dim):
         super(Source, self).__init__()
         self.input_dim = input_dim
+        self.categorical_dim = categorical_dim
         self.fc = nn.Linear(self.input_dim, 100)
         self.a_head = nn.Linear(100, self.categorical_dim)
 
@@ -19,9 +21,9 @@ class Source(nn.Module):
         return F.gumbel_softmax(action_score, tau=1, hard=True, dim=-1)
 
 class Planner(nn.Module):
-    categorical_dim = 5
-    def __init__(self, input_dim):
+    def __init__(self, input_dim, categorical_dim):
         super(Planner, self).__init__()
+        self.categorical_dim = categorical_dim
         self.input_dim = input_dim
         self.fc = nn.Linear(self.input_dim, 100)
         self.fc_ = nn.Linear(self.input_dim, 100)
@@ -39,16 +41,19 @@ class Planner(nn.Module):
 
 class VariationalEmpowerment(object):
     max_grad_norm = .5
-    def __init__(self, input_dim):
-        self.input_dim = input_dim
-        self.source = Source(input_dim)
-        self.planner = Planner(input_dim)
+    def __init__(self, n_s, n_a, n_step):
+        self.input_dim = n_s
+        self.source = Source(n_s, n_a**n_step)
+        self.planner = Planner(n_s, n_a**n_step)
         self.optimizer_planner = optim.Adam(self.planner.parameters(), lr=3e-4)
         self.optimizer_source = optim.Adam(self.source.parameters(), lr=3e-4)
-        self.action_list = numpy_to_torch(np.arange(5)).view(1, -1)
+        self.action_list = numpy_to_torch(np.arange(n_a**n_step)).view(1, -1)
 
-    def compute(self, state, T, n_samples=1000):
-        T = numpy_to_torch(T)
+    def compute(self, state, T, n_step, n_samples=1000):
+        n_states, n_actions, _ = T.shape
+        Bn = transition_matrix_nstep(T, n_s=n_states, n_a=n_actions, n_step=n_step)
+
+        T = numpy_to_torch(Bn)
         s = torch.tensor(state).long().view(-1, 1)
         E = 0
         s_hot = one_hot_vector(s, self.input_dim)
@@ -61,9 +66,11 @@ class VariationalEmpowerment(object):
                 E += int(prob_.max(1)[1] == a.long()) #torch.mm(prob_, z.T)#
         return E / n_samples
 
-    def train(self, T, n_samples=10000):
+    def train(self, T, n_step, n_samples=10000):
         n_states, n_actions, _ = T.shape
-        T = numpy_to_torch(T)
+        Bn = transition_matrix_nstep(T, n_s=n_states, n_a=n_actions, n_step=n_step)
+
+        T = numpy_to_torch(Bn)
         for i in range(n_samples):
             s = (torch.rand(1)*self.input_dim).long().view(-1, 1)
             s_hot = one_hot_vector(s, self.input_dim)
@@ -80,9 +87,11 @@ class VariationalEmpowerment(object):
                                      self.max_grad_norm)
             self.optimizer_planner.step()
 
-    def train_batch(self, T, n_samples=int(5e4), n_b=2**5):
+    def train_batch(self, T, n_step, n_samples=int(5e4), n_b=2**5):
         n_states, n_actions, _ = T.shape
-        T = numpy_to_torch(T)
+        Bn = transition_matrix_nstep(T, n_s=n_states, n_a=n_actions, n_step=n_step)
+
+        T = numpy_to_torch(Bn)
         for i in range(n_samples):
             S = (torch.rand(n_b) * self.input_dim).long().view(-1, 1)
             S_hot = one_hot_batch_matrix(S, self.input_dim)
@@ -136,5 +145,11 @@ def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
     out = torch.bmm(batch, z.float()) # out = [n_b, n_s, 1]
     return out.squeeze(2)
 
+def transition_matrix_nstep(T, n_s, n_a, n_step):
+    nstep_actions = np.array(list(itertools.product(range(n_a), repeat = n_step)))
+    Bn = np.zeros([n_s, len(nstep_actions), n_s])
+    for i, an in enumerate(nstep_actions):
+        Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))
+    return Bn
 
 

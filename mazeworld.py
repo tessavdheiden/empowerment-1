@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from empowerment import Empowerment, EmpowermentBatched
+from variational_empowerment import VariationalEmpowerment
 
 class MazeWorld(object):
     """ Represents an n x m grid world with walls at various locations. Actions can be performed (N, S, E, W, "stay") moving a player around the grid world. You can't move through walls. """
@@ -132,7 +133,7 @@ class MazeWorld(object):
         self.T = T
         return T
 
-    def empowerment(self, n_step, n_samples = 5000, det = 1., batched=True):
+    def empowerment(self, n_step, n_samples = 5000, det = 1., batched=False, neural_networks=True):
         """ 
         Computes the empowerment of all cells and returns as array.
 
@@ -144,7 +145,18 @@ class MazeWorld(object):
             Probability of action successfully performed (otherwise a random different action is performed with probability 1 - det). When det = 1 the dynamics are deterministic. 
         """
         T = self.compute_model()
-        if batched:
+        if neural_networks:
+            empowerment = VariationalEmpowerment(T.shape[0], T.shape[1], n_step)
+            E = np.zeros(self.dims)
+
+            empowerment.train(T=T, n_step=n_step)
+            for y in range(self.dims[0]):
+                for x in range(self.dims[1]):
+                    s = self._cell_to_index((y, x))
+                    E[y, x] = empowerment.compute(T=T, state=s, n_step=n_step)
+            return E
+
+        elif batched:
             empowerment = EmpowermentBatched(deterministic = (det == 1))
             return empowerment.compute(T=T, n_step = n_step).reshape(self.dims)
         else:
@@ -153,7 +165,7 @@ class MazeWorld(object):
             for y in range(self.dims[0]):
                 for x in range(self.dims[1]):
                     s = self._cell_to_index((y,x))
-                    E[y,x] = empowerment.compute(T=T, n_step = n_step, state=s, n_samples=n_samples)
+                    E[y,x] = empowerment.compute(T=T, n_step = n_step, state=s)
             return E
 
 def klyubin_world():
