@@ -3,8 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-from functools import reduce
-import itertools
+
+
+from empowerment_strategy import EmpowermentStrategy
 
 
 class Source(nn.Module):
@@ -39,7 +40,7 @@ class Planner(nn.Module):
         return F.softmax(action_score, dim=-1)
 
 
-class VariationalEmpowerment(object):
+class VariationalEmpowerment(EmpowermentStrategy):
     max_grad_norm = .5
     def __init__(self, n_s, n_a, n_step):
         self.input_dim = n_s
@@ -49,26 +50,33 @@ class VariationalEmpowerment(object):
         self.optimizer_source = optim.Adam(self.source.parameters(), lr=3e-4)
         self.action_list = numpy_to_torch(np.arange(n_a**n_step)).view(1, -1)
 
-    def compute(self, state, T, n_step, n_samples=1000):
+    def compute(self, world, T, n_step, n_samples=int(1e3)):
         n_states, n_actions, _ = T.shape
-        Bn = transition_matrix_nstep(T, n_s=n_states, n_a=n_actions, n_step=n_step)
+        Bn = world.compute_nstep_transition_model(n_step)
 
         T = numpy_to_torch(Bn)
-        s = torch.tensor(state).long().view(-1, 1)
-        E = 0
-        s_hot = one_hot_vector(s, self.input_dim)
-        for i in range(n_samples):
-            with torch.no_grad():
-                z = self.source.forward(s_hot)
-                a = torch.mm(z, self.action_list.T)
-                s_ = torch.mm(T[:, :, int(s.item())], z.T).T
-                prob_ = self.planner.forward(s_hot, s_)
-                E += int(prob_.max(1)[1] == a.long()) #torch.mm(prob_, z.T)#
-        return E / n_samples
 
-    def train(self, T, n_step, n_samples=10000):
+        E = np.zeros(world.dims)
+        for y in range(world.dims[0]):
+            for x in range(world.dims[1]):
+                s = np.array([world._cell_to_index((y, x))])
+                s = numpy_to_torch(s).long().view(-1, 1)
+                s_hot = one_hot_vector(s, self.input_dim)
+                avg = 0
+                for i in range(n_samples):
+                    with torch.no_grad():
+                        z = self.source.forward(s_hot)
+                        a = torch.mm(z, self.action_list.T)
+                        s_ = torch.mm(T[:, :, int(s.item())], z.T).T
+                        prob_ = self.planner.forward(s_hot, s_)
+                        avg += int(prob_.max(1)[1] == a.long())  # torch.mm(prob_, z.T)#
+                E[y, x] = avg / n_samples
+        return E
+
+
+    def train(self, world, T, n_step, n_samples=int(1e5)):
         n_states, n_actions, _ = T.shape
-        Bn = transition_matrix_nstep(T, n_s=n_states, n_a=n_actions, n_step=n_step)
+        Bn = world.compute_nstep_transition_model(n_step)
 
         T = numpy_to_torch(Bn)
         for i in range(n_samples):
@@ -81,15 +89,15 @@ class VariationalEmpowerment(object):
             prob_ = self.planner.forward(s_hot, s_.detach())
 
             self.optimizer_planner.zero_grad()
-            loss = -torch.mm(prob_, z.T) -torch.mm(prob_, (z - 1).T)
+            loss = -torch.mm(prob_, z.T) #-torch.mm(prob_, (z - 1).T)
             loss.backward()
             nn.utils.clip_grad_norm_(self.planner.parameters(),
                                      self.max_grad_norm)
             self.optimizer_planner.step()
 
-    def train_batch(self, T, n_step, n_samples=int(5e4), n_b=2**5):
+    def train_batch(self, world, T, n_step, n_samples=int(5e4), n_b=2**5):
         n_states, n_actions, _ = T.shape
-        Bn = transition_matrix_nstep(T, n_s=n_states, n_a=n_actions, n_step=n_step)
+        Bn = world.compute_nstep_transition_model(T, n_s=n_states, n_a=n_actions, n_step=n_step)
 
         T = numpy_to_torch(Bn)
         for i in range(n_samples):
@@ -145,11 +153,6 @@ def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
     out = torch.bmm(batch, z.float()) # out = [n_b, n_s, 1]
     return out.squeeze(2)
 
-def transition_matrix_nstep(T, n_s, n_a, n_step):
-    nstep_actions = np.array(list(itertools.product(range(n_a), repeat = n_step)))
-    Bn = np.zeros([n_s, len(nstep_actions), n_s])
-    for i, an in enumerate(nstep_actions):
-        Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))
-    return Bn
+
 
 
