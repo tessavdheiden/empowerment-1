@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from empowerment import Empowerment, EmpowermentBatched
-from variational_empowerment import VariationalEmpowerment
 
-class MazeWorld(object):
+from world import World
+
+class MazeWorld(World):
     """ Represents an n x m grid world with walls at various locations. Actions can be performed (N, S, E, W, "stay") moving a player around the grid world. You can't move through walls. """
 
     def __init__(self, height, width, toroidal = False):
@@ -49,6 +49,7 @@ class MazeWorld(object):
         self.adjacencies[new_cell[0]][new_cell[1]].remove(self.opposite[direction])
         # save wall for plotting 
         self.walls.append((cell, new_cell))
+        self.T = None
 
     def act(self, s, a, prob = 1.):
         """ get updated state after action
@@ -76,13 +77,6 @@ class MazeWorld(object):
         for a in actions:
             s = self.act(s, a)
         return s
-
-    def _index_to_cell(self, s):
-        cell = [int(s / self.dims[1]), s % self.dims[1]]
-        return np.array(cell)
-
-    def _cell_to_index(self, cell):
-        return cell[1] + self.dims[1]*cell[0]
     
     def plot(self, pos = None, traj = None, action = None, colorMap = None, vmin = None, vmax = None):
         G = np.zeros(self.dims) if colorMap is None else colorMap.copy()
@@ -116,57 +110,6 @@ class MazeWorld(object):
         if action is not None:
             plt.title(str(action))
 
-    def compute_model(self, det = 1.):
-        """ Computes probabilistic model T[s',a,s] corresponding to the maze world. """
-        n_actions = len(self.actions)
-        n_states = self.dims[0]*self.dims[1]
-        # compute environment dynamics as a matrix T 
-        T = np.zeros([n_states,n_actions,n_states])
-        # T[s',a,s] is the probability of landing in s' given action a is taken in state s.
-        for s in range(n_states):
-            for i, a in enumerate(self.actions.keys()):
-                s_new = self.act(s, a)
-                s_unc = list(map(lambda x : self.act(s, x), filter(lambda x : x != a, self.actions.keys())))
-                T[s_new, i, s] += det
-                for su in s_unc:
-                    T[su, i, s] += (1-det)/(len(s_unc))
-        self.T = T
-        return T
-
-    def empowerment(self, n_step, n_samples = 5000, det = 1., batched=False, neural_networks=True):
-        """ 
-        Computes the empowerment of all cells and returns as array.
-
-        n_step : int
-            Determines the "time horizon" of the empowerment computation. The computed empowerment is the influence the agent has on the future over an n_step time horizon.
-        n_samples : int
-            Number of samples to use for sparse sampling empowerment computation (only used if the number of n-step actions exceeds 1000).         
-        det : float between 0 and 1
-            Probability of action successfully performed (otherwise a random different action is performed with probability 1 - det). When det = 1 the dynamics are deterministic. 
-        """
-        T = self.compute_model()
-        if neural_networks:
-            empowerment = VariationalEmpowerment(T.shape[0], T.shape[1], n_step)
-            E = np.zeros(self.dims)
-
-            empowerment.train(T=T, n_step=n_step)
-            for y in range(self.dims[0]):
-                for x in range(self.dims[1]):
-                    s = self._cell_to_index((y, x))
-                    E[y, x] = empowerment.compute(T=T, state=s, n_step=n_step)
-            return E
-
-        elif batched:
-            empowerment = EmpowermentBatched(deterministic = (det == 1))
-            return empowerment.compute(T=T, n_step = n_step).reshape(self.dims)
-        else:
-            empowerment = Empowerment(deterministic = (det == 1))
-            E = np.zeros(self.dims)
-            for y in range(self.dims[0]):
-                for x in range(self.dims[1]):
-                    s = self._cell_to_index((y,x))
-                    E[y,x] = empowerment.compute(T=T, n_step = n_step, state=s)
-            return E
 
 def klyubin_world():
     """ Build mazeworld from Klyubin et al. """

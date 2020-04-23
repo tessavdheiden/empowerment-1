@@ -1,15 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from mazeworld import MazeWorld
+from world import World
 
-class Pendulum(MazeWorld):
+class Pendulum(World):
     """ Represents an n x m grid world with walls at various locations. Actions can be performed (N, S, E, W, "stay") moving a player around the grid world. You can't move through walls. """
     g = 10.0
     l = 1.0
-    m = 2.0
+    m = 1.0
     dt = 0.05
 
-    def __init__(self, height, width, toroidal = True):
+    def __init__(self, height, width, toroidal = False):
         """
         height : int
             Height of grid world
@@ -22,15 +22,8 @@ class Pendulum(MazeWorld):
         self.height = height
         self.width = width
         self.adjacencies = dict()
-        self.actions = {
-            "FR" : np.array([20]),  # FAST RIGHT
-            "R": np.array([10]),    # FAST RIGHT
-            "SR" : np.array([5]),   # SLOW RIGHT
-            "_" : np.array([0]),    # STAY
-            "SL" : np.array([-5]),  # SLOW RIGHT
-            "L": np.array([-10]),   # FAST LEFT
-            "FL" : np.array([-20])  # FAST LEFT
-        }
+        it = np.linspace(-10, 10, 5)
+        self.actions = dict(zip(it, it))
 
         for i in range(height):
             self.adjacencies[i] = dict()
@@ -73,11 +66,7 @@ class Pendulum(MazeWorld):
             return self._cell_to_index(state)
         new_state = self.forward(state, self.actions[a])
         # can't move off grid
-        if self.toroidal:
-            new_state = self.vecmod(new_state, self.dims)
-        else:
-            if np.any(new_state < np.zeros(2)) or np.any(new_state >= self.dims):
-                return self._cell_to_index(state)
+        new_state = self.vecmod(new_state, self.dims)
         return self._cell_to_index(new_state)
 
     def plot(self, pos = None, traj = None, action = None, colorMap = None, vmin = None, vmax = None):

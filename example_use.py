@@ -1,15 +1,19 @@
 import mazeworld
 from mazeworld import MazeWorld, klyubin_world
 from pendulum import Pendulum
-from empowerment import EmpMaxAgent
+from empowerment import BlahutArimoto, VisitCount, BlahutArimotoTimeOptimal, VisitCountFast
+from agent import EmpMaxAgent
+from variational_empowerment import VariationalEmpowerment
 import numpy as np 
 import matplotlib.pyplot as plt
 import time 
 
 def example_1():      
     """ builds maze world from original empowerment paper(https://uhra.herts.ac.uk/bitstream/handle/2299/1918/901933.pdf?sequence=1) and plots empowerment landscape. 
-    """  
-    maze = MazeWorld(10,10)
+    """
+    n_step = 5
+    strategy = BlahutArimoto()
+    maze = MazeWorld(10, 10)
     for i in range(6):
         maze.add_wall( (1, i), "N" )
     for i in range(2):
@@ -27,42 +31,55 @@ def example_1():
     maze.add_wall( (8, 4), "W")
     maze.add_wall( (8, 3), "N")
     # compute the 5-step empowerment at each cell
-    E = maze.empowerment(n_step=5)
+    T = maze.compute_model()
+    start = time.time()
+    E = strategy.compute(world=maze, T=T, n_step=n_step)
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
     # plot the maze world
     maze.plot(colorMap=E)
-    plt.title('5-step empowerment')
+    plt.title(f'{n_step}-step empowerment')
     plt.show()
 
 def example_2():
-    """ builds grid world with doors and plots empowerment landscape """ 
+    """ builds grid world with doors and plots empowerment landscape """
     maze = MazeWorld(8,8)
+    strategy = VisitCountFast()
     for i in range(maze.width):
-        if i is not 6 : maze.add_wall([2, i], "N") 
+        if i is not 6 : maze.add_wall([2, i], "N")
     for i in range(maze.width):
         if i is not 2 : maze.add_wall([5, i], "N")
     n_step = 4
-    E = maze.empowerment(n_step=n_step, n_samples=8000)
+    T = maze.compute_model()
+    start = time.time()
+    E = strategy.compute(world=maze, T=T, n_step=n_step)
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
+    # plot the maze world
     maze.plot(colorMap=E)
-    plt.title('%i-step empowerment' % n_step)
+    plt.title(f'{n_step}-step empowerment')
     plt.show()
 
 def example_3():
     """ Runs empowerment maximising agent running in a chosen grid world """
-
-    # maze = klyubin_world()
-    maze = mazeworld.door_world()
-    emptymaze = MazeWorld(maze.height, maze.width)
-    # maze = mazeworld.tunnel_world()
+    # maze
     n_step = 3
-    start = time.time()
-    initpos = np.random.randint(maze.dims[0], size=2)
-    initpos = [1,4]
-    s =  maze._cell_to_index(initpos)
-    T = emptymaze.compute_model()
+    maze = mazeworld.door_world() # klyubin_world(), tunnel_world()
     B = maze.compute_model()
-    E = maze.empowerment(n_step = n_step).reshape(-1)
+    strategy = VisitCountFast()
+    E = strategy.compute(world=maze, T=B, n_step=n_step).reshape(-1)
+
+    initpos = [4,4] # np.random.randint(maze.dims[0], size=2)
+    s =  maze._cell_to_index(initpos)
+
+    # for reference
+    emptymaze = MazeWorld(maze.height, maze.width)
+    T = emptymaze.compute_model()
     n_s, n_a, _ = T.shape
-    agent = EmpMaxAgent(alpha=0.1, gamma=0.9, T = T, n_step=n_step, n_samples=1000, det=1.)
+
+    # agent
+    agent = EmpMaxAgent(alpha=0.1, gamma=0.9, T=T, n_step=n_step, n_samples=1000, det=1.)
+
+    # training loop
+    start = time.time()
     steps = int(10000)
     visited = np.zeros(maze.dims)
     tau = np.zeros(steps)
@@ -80,6 +97,8 @@ def example_3():
         agent.update(s,a,s_)
         s = s_
     print("elapsed seconds: %0.3f" % (time.time() - start) )
+
+    # some plotting
     plt.figure(1)
     plt.title("value and action map")
     Vmap = agent.value_map.reshape(*maze.dims)
@@ -114,20 +133,36 @@ def example_3():
     plt.show()
 
 def example_4():
-    """ builds maze world from original empowerment paper(https://uhra.herts.ac.uk/bitstream/handle/2299/1918/901933.pdf?sequence=1) and plots empowerment landscape.
+    """ builds pendulum according to https://github.com/openai/gym/wiki/Pendulum-v0
     """
     pendulum = Pendulum(9,15)
-    # compute the 5-step empowerment at each cell
-    E = pendulum.empowerment(n_step=5, det=1.)
-    # plot the maze world
+    strategy = VisitCount()
+    T = pendulum.compute_model()
+    n_step = 5
+    E = strategy.compute(world=pendulum, T=T, n_step=n_step)
+    # plot the landscape
     pendulum.plot(colorMap=E)
-    plt.title('5-step empowerment')
+    plt.title(f'{n_step}-step empowerment')
+    plt.show()
+
+def example_5():
+    """ compute empowerment landscape with neural networks"""
+    maze = MazeWorld(5, 5)
+    n_step = 2
+    start = time.time()
+    T = maze.compute_model()
+    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    strategy.train(world=maze, T=T, n_step=n_step)
+    E = strategy.compute(world=maze, T=T, n_step=n_step)
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
+    maze.plot(colorMap=E)
+    plt.title('%i-step empowerment' % n_step)
     plt.show()
 
 
 if __name__ == "__main__":
     ## uncomment below to see examples 
-    # example_1()
     # example_2()
-    example_3()
-    # example_4()
+    # example_3()
+    example_4()
+    # example_5()
