@@ -4,9 +4,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 from empowerment_strategy import EmpowermentStrategy
 
+
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class Source(nn.Module):
     def __init__(self, input_dim, categorical_dim):
@@ -44,34 +47,29 @@ class VariationalEmpowerment(EmpowermentStrategy):
     max_grad_norm = .5
     def __init__(self, n_s, n_a, n_step):
         self.input_dim = n_s
-        self.source = Source(n_s, n_a**n_step)
-        self.planner = Planner(n_s, n_a**n_step)
+        self.source = Source(n_s, n_a**n_step).to(device)
+        self.planner = Planner(n_s, n_a**n_step).to(device)
         self.optimizer_planner = optim.Adam(self.planner.parameters(), lr=3e-4)
         self.optimizer_source = optim.Adam(self.source.parameters(), lr=3e-4)
-        self.action_list = torch.from_numpy(np.arange(n_a**n_step)).float().view(1, -1)
+        self.action_list = torch.from_numpy(np.arange(n_a**n_step)).float().view(1, -1).to(device)
 
     def compute(self, world, T, n_step, n_samples=int(1e3)):
         n_states, n_actions, _ = T.shape
         Bn = world.compute_nstep_transition_model(n_step)
 
-        T = torch.from_numpy(Bn).float()
+        T = torch.from_numpy(Bn).float().to(device)
 
-        E = np.zeros(world.dims)
-        for y in range(world.dims[0]):
-            for x in range(world.dims[1]):
-                s = np.array([world._cell_to_index((y, x))])
-                s = torch.from_numpy(s).long().view(-1, 1)
-                s_hot = one_hot_vector(s, self.input_dim)
-                avg = 0
-                for i in range(n_samples):
-                    with torch.no_grad():
-                        z = self.source.forward(s_hot)
-                        a = torch.mm(z, self.action_list.T)
-                        s_ = torch.mm(T[:, :, int(s.item())], z.T).T
-                        prob_ = self.planner.forward(s_hot, s_)
-                        avg += int(prob_.max(1)[1] == a.long())  # torch.mm(prob_, z.T)#
-                E[y, x] = avg / n_samples
-        return E
+        S = torch.arange(n_states).view(-1, 1).to(device)
+        S_hot = one_hot_batch_matrix(S, n_states).to(device).float()
+        avg = torch.zeros(world.dims).to(device)
+        for i in range(n_samples):
+            with torch.no_grad():
+                z = self.source.forward(S_hot)
+                s_ = get_s_next_from_s_batch_matrix(T, S, z)#torch.mm(T[:, :, int(S[idx].item())], z.T).T
+                prob_ = self.planner.forward(S_hot, s_)
+                avg += (prob_.max(1)[1] == z.max(1)[1]).long().view(world.dims)  # torch.mm(prob_, z.T)#
+        E = torch.log2(avg / n_samples)
+        return E.cpu().numpy()
 
     def train(self, world, T, n_step, n_samples=int(1e5)):
         n_states, n_actions, _ = T.shape
@@ -98,13 +96,17 @@ class VariationalEmpowerment(EmpowermentStrategy):
         n_states, n_actions, _ = T.shape
         Bn = world.compute_nstep_transition_model(n_step=n_step)
 
-        T = torch.from_numpy(Bn).float()
+        T = torch.from_numpy(Bn).float().to(device)
+        S = torch.randint(0, self.input_dim, (n_b*n_samples,)).view(-1, 1).to(device)
+
+        start = time.time()
         for i in range(n_samples):
-            S = torch.randint(0, self.input_dim, (n_b, ))
-            S_hot = one_hot_batch_matrix(S, self.input_dim).float()
+            idx = i*n_b
+
+            S_hot = one_hot_batch_matrix(S[idx:idx+n_b], self.input_dim).float()
             Z = self.source.forward(S_hot.float())
 
-            S_ = get_s_next_from_s_batch_matrix(T, S.view(-1, 1), Z)
+            S_ = get_s_next_from_s_batch_matrix(T, S[idx:idx+n_b], Z)
 
             prob_ = self.planner.forward(S_hot, S_.detach())
 
@@ -116,11 +118,14 @@ class VariationalEmpowerment(EmpowermentStrategy):
                                      self.max_grad_norm)
             self.optimizer_planner.step()
             if i % 1000 == 0:
+                print(f"elapsed seconds: {time.time() - start:0.3f}")
+                start = time.time()
                 E = self.compute(world, T, n_step)
                 (fig, ax) = plt.subplots(1)
                 world.plot(colorMap=E, figax=(fig, ax))
                 plt.savefig(f"results/{i}.png")
                 plt.close(fig)
+
 
 def one_hot_vector(x, input_dim):
     return torch.zeros(1, input_dim).scatter_(1, x.view(-1, 1), 1)
