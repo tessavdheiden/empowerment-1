@@ -100,11 +100,11 @@ class VariationalEmpowerment(EmpowermentStrategy):
 
         T = torch.from_numpy(Bn).float()
         for i in range(n_samples):
-            S = (torch.rand(n_b) * self.input_dim).long().view(-1, 1)
-            S_hot = one_hot_batch_matrix(S, self.input_dim)
+            S = torch.randint(0, self.input_dim, (n_b, ))
+            S_hot = one_hot_batch_matrix(S, self.input_dim).float()
             Z = self.source.forward(S_hot.float())
 
-            S_ = get_s_next_from_one_hot_batch_matrix(T, S_hot, Z)
+            S_ = get_s_next_from_s_batch_matrix(T, S.view(-1, 1), Z)
 
             prob_ = self.planner.forward(S_hot, S_.detach())
 
@@ -122,14 +122,11 @@ class VariationalEmpowerment(EmpowermentStrategy):
                 plt.savefig(f"results/{i}.png")
                 plt.close(fig)
 
-def numpy_to_torch(x):
-    return torch.from_numpy(x).float()
-
 def one_hot_vector(x, input_dim):
     return torch.zeros(1, input_dim).scatter_(1, x.view(-1, 1), 1)
 
 def one_hot_batch_matrix(x, input_dim):
-    return torch.zeros(x.shape[0], input_dim).scatter_(1, x.view(-1, 1), 1)
+    return torch.nn.functional.one_hot(x, num_classes=input_dim).view(x.shape[0], input_dim)
 
 def get_s_next_from_one_hot(T, s_hot, z):
     assert s_hot.shape[1] > 1
@@ -157,6 +154,15 @@ def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
     out = torch.bmm(batch, z.float()) # out = [n_b, n_s, 1]
     return out.squeeze(2)
 
+def get_s_next_from_s_batch_matrix(T, s, z):
+    n_s, n_a, _ = T.shape
+    n_b, _ = s.shape
+    t = T.view(1, n_s * n_a, n_s).repeat(n_b, 1, 1)
+    batch = t.gather(-1, s.view(-1, 1, 1).repeat(1, n_a * n_s, 1)).view(n_b, n_s, n_a).float()
+    z = z.view(n_b, n_a, 1)
+
+    out = torch.bmm(batch, z.float()) # out = [n_b, n_s, 1]
+    return out.squeeze(2)
 
 
 

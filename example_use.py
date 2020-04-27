@@ -148,7 +148,7 @@ def example_4():
 def example_5():
     """ compute empowerment landscape with neural networks"""
     maze = MazeWorld(5, 5)
-    n_step = 1
+    n_step = 2
     start = time.time()
     T = maze.compute_model()
     strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
