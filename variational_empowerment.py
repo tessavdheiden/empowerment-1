@@ -22,17 +22,17 @@ class Source(nn.Module):
     def forward(self, x):
         x = F.relu(self.fc(x))
         action_score = self.a_head(x)
-        return F.gumbel_softmax(action_score, tau=1, hard=True, dim=-1)
+        return F.gumbel_softmax(action_score, tau=1, hard=True, dim=-1), F.gumbel_softmax(action_score, tau=1, hard=False, dim=-1)
 
 class Planner(nn.Module):
     def __init__(self, input_dim, categorical_dim):
         super(Planner, self).__init__()
         self.categorical_dim = categorical_dim
         self.input_dim = input_dim
-        self.fc = nn.Linear(self.input_dim, 100)
-        self.fc_ = nn.Linear(self.input_dim, 100)
-        self.hidden = nn.Linear(200, 200)
-        self.a_head = nn.Linear(200, self.categorical_dim)
+        self.fc = nn.Linear(self.input_dim, 200)
+        self.fc_ = nn.Linear(self.input_dim, 200)
+        self.hidden = nn.Linear(400, 400)
+        self.a_head = nn.Linear(400, self.categorical_dim)
 
     def forward(self, x, x_):
         x = F.relu(self.fc(x))
@@ -51,6 +51,8 @@ class VariationalEmpowerment(EmpowermentStrategy):
         self.planner = Planner(n_s, n_a**n_step).to(device)
         self.optimizer_planner = optim.Adam(self.planner.parameters(), lr=3e-4)
         self.optimizer_source = optim.Adam(self.source.parameters(), lr=3e-4)
+        self.params = list(self.source.parameters()) + list(self.planner.parameters())
+        self.optimizer = optim.Adam(self.params, lr=3e-4)
         self.action_list = torch.from_numpy(np.arange(n_a**n_step)).float().view(1, -1).to(device)
 
     def compute(self, world, T, n_step, n_samples=int(1e3)):
@@ -64,7 +66,7 @@ class VariationalEmpowerment(EmpowermentStrategy):
         avg = torch.zeros(world.dims).to(device)
         for i in range(n_samples):
             with torch.no_grad():
-                z = self.source.forward(S_hot)
+                z, _ = self.source.forward(S_hot)
                 s_ = get_s_next_from_s_batch_matrix(T, S, z)#torch.mm(T[:, :, int(S[idx].item())], z.T).T
                 prob_ = self.planner.forward(S_hot, s_)
                 avg += (prob_.max(1)[1] == z.max(1)[1]).long().view(world.dims)  # torch.mm(prob_, z.T)#
@@ -92,7 +94,7 @@ class VariationalEmpowerment(EmpowermentStrategy):
                                      self.max_grad_norm)
             self.optimizer_planner.step()
 
-    def train_batch(self, world, T, n_step, n_samples=int(5e4), n_b=2**5):
+    def train_batch(self, world, T, n_step, n_samples=int(5e5), n_b=2**5):
         n_states, n_actions, _ = T.shape
         Bn = world.compute_nstep_transition_model(n_step=n_step)
 
@@ -104,20 +106,20 @@ class VariationalEmpowerment(EmpowermentStrategy):
             idx = i*n_b
 
             S_hot = one_hot_batch_matrix(S[idx:idx+n_b], self.input_dim).float()
-            Z = self.source.forward(S_hot.float())
+            Z, prob = self.source.forward(S_hot.float())
 
             S_ = get_s_next_from_s_batch_matrix(T, S[idx:idx+n_b], Z)
 
             prob_ = self.planner.forward(S_hot, S_.detach())
 
-            self.optimizer_planner.zero_grad()
-            error = -torch.mul(prob_, Z).sum(1) -torch.mul(prob_, (Z - 1)).sum(1)
+            self.optimizer.zero_grad()
+            error = -torch.mul(prob_, Z.detach()).sum(1) -torch.mul(prob_, (Z.detach() - 1)).sum(1) + torch.mul(prob, Z).sum(1)
             loss = error.mean()
             loss.backward()
-            nn.utils.clip_grad_norm_(self.planner.parameters(),
-                                     self.max_grad_norm)
-            self.optimizer_planner.step()
-            if i % 1000 == 0:
+            nn.utils.clip_grad_norm_(self.params, self.max_grad_norm)
+            self.optimizer.step()
+
+            if i % 10000 == 0:
                 print(f"elapsed seconds: {time.time() - start:0.3f}")
                 start = time.time()
                 E = self.compute(world, T, n_step)
