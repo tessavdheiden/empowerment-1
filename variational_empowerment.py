@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 from empowerment_strategy import EmpowermentStrategy
 
@@ -48,19 +48,19 @@ class VariationalEmpowerment(EmpowermentStrategy):
         self.planner = Planner(n_s, n_a**n_step)
         self.optimizer_planner = optim.Adam(self.planner.parameters(), lr=3e-4)
         self.optimizer_source = optim.Adam(self.source.parameters(), lr=3e-4)
-        self.action_list = numpy_to_torch(np.arange(n_a**n_step)).view(1, -1)
+        self.action_list = torch.from_numpy(np.arange(n_a**n_step)).float().view(1, -1)
 
     def compute(self, world, T, n_step, n_samples=int(1e3)):
         n_states, n_actions, _ = T.shape
         Bn = world.compute_nstep_transition_model(n_step)
 
-        T = numpy_to_torch(Bn)
+        T = torch.from_numpy(Bn).float()
 
         E = np.zeros(world.dims)
         for y in range(world.dims[0]):
             for x in range(world.dims[1]):
                 s = np.array([world._cell_to_index((y, x))])
-                s = numpy_to_torch(s).long().view(-1, 1)
+                s = torch.from_numpy(s).long().view(-1, 1)
                 s_hot = one_hot_vector(s, self.input_dim)
                 avg = 0
                 for i in range(n_samples):
@@ -73,12 +73,11 @@ class VariationalEmpowerment(EmpowermentStrategy):
                 E[y, x] = avg / n_samples
         return E
 
-
     def train(self, world, T, n_step, n_samples=int(1e5)):
         n_states, n_actions, _ = T.shape
         Bn = world.compute_nstep_transition_model(n_step)
 
-        T = numpy_to_torch(Bn)
+        T = torch.from_numpy(Bn).float()
         for i in range(n_samples):
             s = (torch.rand(1)*self.input_dim).long().view(-1, 1)
             s_hot = one_hot_vector(s, self.input_dim)
@@ -97,9 +96,9 @@ class VariationalEmpowerment(EmpowermentStrategy):
 
     def train_batch(self, world, T, n_step, n_samples=int(5e4), n_b=2**5):
         n_states, n_actions, _ = T.shape
-        Bn = world.compute_nstep_transition_model(T, n_s=n_states, n_a=n_actions, n_step=n_step)
+        Bn = world.compute_nstep_transition_model(n_step=n_step)
 
-        T = numpy_to_torch(Bn)
+        T = torch.from_numpy(Bn).float()
         for i in range(n_samples):
             S = (torch.rand(n_b) * self.input_dim).long().view(-1, 1)
             S_hot = one_hot_batch_matrix(S, self.input_dim)
@@ -116,7 +115,12 @@ class VariationalEmpowerment(EmpowermentStrategy):
             nn.utils.clip_grad_norm_(self.planner.parameters(),
                                      self.max_grad_norm)
             self.optimizer_planner.step()
-
+            if i % 1000 == 0:
+                E = self.compute(world, T, n_step)
+                (fig, ax) = plt.subplots(1)
+                world.plot(colorMap=E, figax=(fig, ax))
+                plt.savefig(f"results/{i}.png")
+                plt.close(fig)
 
 def numpy_to_torch(x):
     return torch.from_numpy(x).float()

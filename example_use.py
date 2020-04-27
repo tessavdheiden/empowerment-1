@@ -148,21 +148,24 @@ def example_4():
 def example_5():
     """ compute empowerment landscape with neural networks"""
     maze = MazeWorld(5, 5)
-    n_step = 2
+    n_step = 1
     start = time.time()
     T = maze.compute_model()
     strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
-    strategy.train(world=maze, T=T, n_step=n_step)
+    strategy.train_batch(world=maze, T=T, n_step=n_step)
+    #strategy = VisitCount()
     E = strategy.compute(world=maze, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     maze.plot(colorMap=E)
     plt.title('%i-step empowerment' % n_step)
-    plt.show()
+    plt.savefig("results/finalE.png")
 
 
 if __name__ == "__main__":
-    ## uncomment below to see examples 
+    from pathlib import Path
+    Path("results").mkdir(parents=True, exist_ok=True)
+    ## uncomment below to see examples
     # example_2()
     # example_3()
-    example_4()
-    # example_5()
+    # example_4()
+    example_5()

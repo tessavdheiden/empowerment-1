@@ -7,7 +7,7 @@ class MazeWorld(World):
     """ Represents an n x m grid world with walls at various locations. Actions can be performed (N, S, E, W, "stay") moving a player around the grid world. You can't move through walls. """
 
     def __init__(self, height, width, toroidal = False):
-        """ 
+        """
         height : int 
             Height of grid world 
         width : int
@@ -78,24 +78,25 @@ class MazeWorld(World):
             s = self.act(s, a)
         return s
     
-    def plot(self, pos = None, traj = None, action = None, colorMap = None, vmin = None, vmax = None):
+    def plot(self, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None, figax=plt.subplots(1)):
         G = np.zeros(self.dims) if colorMap is None else colorMap.copy()
-        # plot color map 
+        fig, ax = figax
+        # plot color map
         if vmax is not None:
-            plt.pcolor(G, vmin = vmin, vmax=vmax) # , cmap = 'Greys')
+            im = ax.pcolor(G, vmin=vmin, vmax=vmax) # , cmap = 'Greys')
         else:
-            plt.pcolor(G)
-        plt.colorbar()
+            im = ax.pcolor(G)
+        fig.colorbar(im, ax=ax)
         if pos is not None:
-            plt.scatter([pos[1] + 0.5], [pos[0] + 0.5], s = 100, c = 'w')
+            ax.scatter([pos[1] + 0.5], [pos[0] + 0.5], s = 100, c = 'w')
         # plot trajectory
         if traj is not None:
             y, x = zip(*traj)
             y = np.array(y) + 0.5
             x = np.array(x) + 0.5
-            plt.plot(x, y)
-            plt.scatter([x[0]], [y[0]], s = 100, c = 'b')
-            plt.scatter([x[-1]], [y[-1]], s = 100, c = 'r')
+            ax.plot(x, y)
+            ax.scatter([x[0]], [y[0]], s = 100, c = 'b')
+            ax.scatter([x[-1]], [y[-1]], s = 100, c = 'r')
         for wall in self.walls:
             y, x = zip(*wall)
             if x[0] == x[1]:
@@ -106,9 +107,9 @@ class MazeWorld(World):
                 # vertical wall
                 x = [max(x), max(x)]
                 y = [y[0], y[0] + 1]
-            plt.plot(x, y, c = 'w')
+            ax.plot(x, y, c = 'w')
         if action is not None:
-            plt.title(str(action))
+            ax.set_title(str(action))
 
 
 def klyubin_world():

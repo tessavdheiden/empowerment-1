@@ -5,15 +5,6 @@ import torch
 from variational_empowerment import *
 
 class VETest(unittest.TestCase):
-    def test_numpy_to_torch(self):
-        n = np.array([1])
-        t = numpy_to_torch(n)
-        self.assertIsInstance(t, torch.Tensor)
-
-        n = np.random.rand(10, 10)
-        t = numpy_to_torch(n)
-        self.assertEqual(t.shape, (10, 10))
-
     def test_one_hot(self):
         t = torch.tensor([1])
         y = one_hot_vector(t, 4)
