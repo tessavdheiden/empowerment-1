@@ -16,8 +16,8 @@ class Source(nn.Module):
         super(Source, self).__init__()
         self.input_dim = input_dim
         self.categorical_dim = categorical_dim
-        self.fc = nn.Linear(self.input_dim, 100)
-        self.a_head = nn.Linear(100, self.categorical_dim)
+        self.fc = nn.Linear(self.input_dim, 200)
+        self.a_head = nn.Linear(200, self.categorical_dim)
 
     def forward(self, x):
         x = F.relu(self.fc(x))
@@ -56,64 +56,51 @@ class VariationalEmpowerment(EmpowermentStrategy):
         self.action_list = torch.from_numpy(np.arange(n_a**n_step)).float().view(1, -1).to(device)
 
     def compute(self, world, T, n_step, n_samples=int(1e3)):
-        n_states, n_actions, _ = T.shape
+        n_states, _, _ = T.shape
         Bn = world.compute_nstep_transition_model(n_step)
+        _, n_actionseq, _ = Bn.shape
 
         T = torch.from_numpy(Bn).float().to(device)
 
         S = torch.arange(n_states).view(-1, 1).to(device)
         S_hot = one_hot_batch_matrix(S, n_states).to(device).float()
         avg = torch.zeros(world.dims).to(device)
+        # sets = [set() for _ in range(n_states)]
         for i in range(n_samples):
             with torch.no_grad():
-                z, _ = self.source.forward(S_hot)
+                z, prob = self.source.forward(S_hot)
                 s_ = get_s_next_from_s_batch_matrix(T, S, z)#torch.mm(T[:, :, int(S[idx].item())], z.T).T
+                # [set.add(ss_.max(0)[1].item()) for set, ss_ in zip(sets, s_)]
                 prob_ = self.planner.forward(S_hot, s_)
-                avg += (prob_.max(1)[1] == z.max(1)[1]).long().view(world.dims)  # torch.mm(prob_, z.T)#
+                # avg += (prob_.max(1)[1] == z.max(1)[1]).long().view(world.dims)  # torch.mm(prob_, z.T)#
+                avg += (torch.mul(prob_, z.detach()).sum(1) - torch.mul(prob, z).sum(1)).view(world.dims)
         E = torch.log2(avg / n_samples)
         return E.cpu().numpy()
 
-    def train(self, world, T, n_step, n_samples=int(1e5)):
-        n_states, n_actions, _ = T.shape
-        Bn = world.compute_nstep_transition_model(n_step)
+    def train_batch(self, world, T, n_step, n_samples=int(5e5)):
+        """
+         Compute the empowerment of a grid world with neural networks
+         See eq 3 and 5 of https: // arxiv.org / pdf / 1710.05101.pdf
+         """
 
-        T = torch.from_numpy(Bn).float()
-        for i in range(n_samples):
-            s = (torch.rand(1)*self.input_dim).long().view(-1, 1)
-            s_hot = one_hot_vector(s, self.input_dim)
-            z = self.source.forward(s_hot)
-
-            s_ = get_s_next_from_one_hot(T, s_hot, z)
-
-            prob_ = self.planner.forward(s_hot, s_.detach())
-
-            self.optimizer_planner.zero_grad()
-            loss = -torch.mm(prob_, z.T) #-torch.mm(prob_, (z - 1).T)
-            loss.backward()
-            nn.utils.clip_grad_norm_(self.planner.parameters(),
-                                     self.max_grad_norm)
-            self.optimizer_planner.step()
-
-    def train_batch(self, world, T, n_step, n_samples=int(5e5), n_b=2**5):
         n_states, n_actions, _ = T.shape
         Bn = world.compute_nstep_transition_model(n_step=n_step)
 
         T = torch.from_numpy(Bn).float().to(device)
-        S = torch.randint(0, self.input_dim, (n_b*n_samples,)).view(-1, 1).to(device)
+        states = torch.arange(n_states).view(-1, 1).to(device)
 
         start = time.time()
         for i in range(n_samples):
-            idx = i*n_b
-
-            S_hot = one_hot_batch_matrix(S[idx:idx+n_b], self.input_dim).float()
+            S = states[torch.randperm(states.size()[0])]
+            S_hot = one_hot_batch_matrix(S, self.input_dim).float()
             Z, prob = self.source.forward(S_hot.float())
 
-            S_ = get_s_next_from_s_batch_matrix(T, S[idx:idx+n_b], Z)
+            S_ = get_s_next_from_s_batch_matrix(T, S, Z)
 
             prob_ = self.planner.forward(S_hot, S_.detach())
 
             self.optimizer.zero_grad()
-            error = -torch.mul(prob_, Z.detach()).sum(1) -torch.mul(prob_, (Z.detach() - 1)).sum(1) + torch.mul(prob, Z).sum(1)
+            error = -torch.mul(prob_, Z.detach()).sum(1) + torch.mul(prob, Z).sum(1)
             loss = error.mean()
             loss.backward()
             nn.utils.clip_grad_norm_(self.params, self.max_grad_norm)
