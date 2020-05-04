@@ -98,8 +98,8 @@ def blahut_arimoto_batched(P_yx, q_x, epsilon = 0.001, iters = 20):
         # check convergence
         T = np.max(log2(r_x/q_x), axis=0) - C
         # update q
-        q_x = (r_x + eps)
-        q_x /= q_x.sum(axis=0)
+        q_x[:] = r_x + eps # passed by reference
+        q_x[:] = _normalize_mat(q_x)
         i+=1
     C[C < 0] = 0
     return C
@@ -126,7 +126,7 @@ def blahut_arimoto(P_yx, q_x, epsilon = 0.001, deterministic = False, iters = 20
             # check convergence
             T = np.max(log2(r_x/q_x)) - C
             # update q
-            q_x = _normalize(r_x + eps)
+            q_x[:] = _normalize(r_x + eps)
             i+=1
         if C < 0:
             C = 0
@@ -147,3 +147,7 @@ def _normalize(P):
     if s == 0.:
         raise ValueError("input distribution has sum zero")
     return P / s
+
+def _normalize_mat(P):
+    row_sums = P.sum(axis=1)
+    return P / row_sums[:, np.newaxis]

@@ -1,3 +1,7 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
+
 class EmpowermentStrategy(object):
     def compute(self, world, T, det, n_step):
         """
@@ -19,3 +23,18 @@ class EmpowermentStrategy(object):
             State for which to compute the empowerment.
         """
         raise NotImplementedError
+
+    @property
+    def action_map(self):
+        return np.argmax(self.q_x, axis=0)
+
+    def plot(self, width, height):
+        Amap = self.action_map
+        n_states = width * height
+        assert self.q_x.shape[1] == n_states
+        assert np.sum(np.isnan(self.q_x)) == (n_states*self.q_x.shape[0]) or (all(np.sum(self.q_x, axis=0) > .9) and all(np.sum(self.q_x, axis=0) < 1.1))
+        prob = np.max(self.q_x, axis=0)
+        if not np.sum(np.isnan(self.q_x)) == (n_states*self.q_x.shape[0]):
+            U = np.array([(1 if a == 2 else (-1 if a == 3 else 0)) for a in Amap]).reshape(height, width)
+            V = np.array([(1 if a == 0 else (-1 if a == 1 else 0)) for a in Amap]).reshape(height, width)
+            plt.quiver(np.arange(width) + .5, np.arange(height) + .5, U * prob.reshape(height, width), V * prob.reshape(height, width))

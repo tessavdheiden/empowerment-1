@@ -10,11 +10,9 @@ from empowerment_strategy import EmpowermentStrategy
 from info_theory import blahut_arimoto, _rand_dist, blahut_arimoto_batched
 
 
-def normalize(X):
-    """ 
-    Normalize vector or matrix columns X
-    """
-    return X / X.sum(axis=0)
+def _normalize_mat(P):
+    row_sums = P.sum(axis=1)
+    return P / row_sums[:, np.newaxis]
 
 
 class BlahutArimoto(EmpowermentStrategy):
@@ -28,14 +26,16 @@ class BlahutArimoto(EmpowermentStrategy):
         nstep_actions = list(itertools.product(range(n_actions), repeat=n_step))
         Bn = np.zeros([n_states, len(nstep_actions), n_states])
         q_x = _rand_dist((Bn.shape[1],))
+        self.q_x = _normalize_mat(np.repeat(np.expand_dims(q_x, axis=1), n_states, axis=1))
         for i, an in enumerate(nstep_actions):
             Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))
 
         E = np.zeros(world.dims)
         for y in range(world.dims[0]):
             for x in range(world.dims[1]):
+                idx = int(y*world.dims[1] + x)
                 s = world._cell_to_index((y, x))
-                E[y, x] = blahut_arimoto(Bn[:, :, s], q_x, epsilon=epsilon)
+                E[y, x] = blahut_arimoto(Bn[:, :, s], self.q_x[:, idx], epsilon=epsilon)
 
         return E
 
@@ -53,7 +53,7 @@ class VisitCount(EmpowermentStrategy):
             nstep_samples = np.array(list(itertools.product(range(n_actions), repeat = n_step)))
         else:
             nstep_samples = np.random.randint(0,n_actions, [n_samples,n_step])
-
+        self.q_x = _normalize_mat(np.random.rand(n_actions**n_step, n_states))
         # fold over each nstep actions, get unique end states
         tmap = lambda s, a: np.argmax(T[:, a, s])
 
@@ -78,8 +78,8 @@ class BlahutArimotoTimeOptimal(EmpowermentStrategy):
         for i, an in enumerate(nstep_actions):
             Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))
 
-        q_x = normalize(np.repeat(np.expand_dims(q_x, axis=1), n_states, axis=1))
-        return blahut_arimoto_batched(Bn, q_x, epsilon=epsilon).reshape(world.dims)
+        self.q_x = _normalize_mat(np.repeat(np.expand_dims(q_x, axis=1), n_states, axis=1))
+        return blahut_arimoto_batched(Bn, self.q_x, epsilon=epsilon).reshape(world.dims)
 
 
 class VisitCountFast(EmpowermentStrategy):
@@ -90,6 +90,7 @@ class VisitCountFast(EmpowermentStrategy):
             nstep_actions = np.array(list(itertools.product(range(n_actions), repeat=n_step)))
         else:
             nstep_actions = np.random.randint(0, n_actions, [n_samples, n_step])
+        self.q_x = _normalize_mat(np.random.rand(n_actions ** n_step, n_states))
         Bn = np.zeros([n_states, len(nstep_actions), n_states])
         for i, an in enumerate(nstep_actions):
             Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))

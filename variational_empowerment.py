@@ -19,10 +19,11 @@ class Source(nn.Module):
         self.fc = nn.Linear(self.input_dim, 200)
         self.a_head = nn.Linear(200, self.categorical_dim)
 
-    def forward(self, x):
+    def forward(self, x, temp=1):
         x = F.relu(self.fc(x))
         action_score = self.a_head(x)
-        return F.gumbel_softmax(action_score, tau=1, hard=True, dim=-1), F.gumbel_softmax(action_score, tau=1, hard=False, dim=-1)
+        #z = torch.nn.functional.one_hot(prob.max(1)[1], num_classes=self.categorical_dim).view(-1, self.categorical_dim)
+        return F.gumbel_softmax(action_score, hard=True, dim=-1, tau=temp), F.gumbel_softmax(action_score, hard=False, dim=-1, tau=temp)
 
 class Planner(nn.Module):
     def __init__(self, input_dim, categorical_dim):
@@ -33,6 +34,7 @@ class Planner(nn.Module):
         self.fc_ = nn.Linear(self.input_dim, 200)
         self.hidden = nn.Linear(400, 400)
         self.a_head = nn.Linear(400, self.categorical_dim)
+        self.temp = 1
 
     def forward(self, x, x_):
         x = F.relu(self.fc(x))
@@ -45,6 +47,9 @@ class Planner(nn.Module):
 
 class VariationalEmpowerment(EmpowermentStrategy):
     max_grad_norm = .5
+    temp_min = .1
+    anneal_rate = 3e-7#0.00003
+    temp = 10.
     def __init__(self, n_s, n_a, n_step):
         self.input_dim = n_s
         self.source = Source(n_s, n_a**n_step).to(device)
@@ -65,16 +70,24 @@ class VariationalEmpowerment(EmpowermentStrategy):
         S = torch.arange(n_states).view(-1, 1).to(device)
         S_hot = one_hot_batch_matrix(S, n_states).to(device).float()
         avg = torch.zeros(world.dims).to(device)
-        # sets = [set() for _ in range(n_states)]
-        for i in range(n_samples):
+        n_samples = max(n_samples, n_states*n_actionseq)
+
+        for j in range(n_samples):
             with torch.no_grad():
                 z, prob = self.source.forward(S_hot)
-                s_ = get_s_next_from_s_batch_matrix(T, S, z)#torch.mm(T[:, :, int(S[idx].item())], z.T).T
-                # [set.add(ss_.max(0)[1].item()) for set, ss_ in zip(sets, s_)]
+                s_ = get_s_next_from_s_batch_matrix(T, S, z)
                 prob_ = self.planner.forward(S_hot, s_)
-                # avg += (prob_.max(1)[1] == z.max(1)[1]).long().view(world.dims)  # torch.mm(prob_, z.T)#
-                avg += (torch.mul(prob_, z.detach()).sum(1) - torch.mul(prob, z).sum(1)).view(world.dims)
+                avg += (torch.mul(prob_, z.detach()).sum(1)).view(world.dims) #- torch.mul(prob, z).sum(1)).view(world.dims)
+                if j % 499 == 0:
+                    for i, s in enumerate(S):
+                        if prob_[i].max(0)[1] != z[i].max(0)[1] and (s == 8 or s == 18):
+                        #if s == 8 or s == 18:
+                            print(f"s={s.item()}, s_={s_[i].max(0)[1]}, p={prob_[i].max(0)[1]}, z_source={z[i].max(0)[1]}, \n"
+                                  f"probs = {prob[i].data.cpu().numpy()}, \n"
+                                  f"probs_planning = {prob_[i].data.cpu().numpy()}")
+
         E = torch.log2(avg / n_samples)
+        self.q_x = prob.transpose(1, 0).cpu().numpy()
         return E.cpu().numpy()
 
     def train_batch(self, world, T, n_step, n_samples=int(5e5)):
@@ -91,6 +104,7 @@ class VariationalEmpowerment(EmpowermentStrategy):
 
         start = time.time()
         for i in range(n_samples):
+            #if i % 100 == 0 and i != 0: self.temp = np.maximum(self.temp * np.exp(-self.anneal_rate * i), self.temp_min)
             S = states[torch.randperm(states.size()[0])]
             S_hot = one_hot_batch_matrix(S, self.input_dim).float()
             Z, prob = self.source.forward(S_hot.float())
@@ -112,6 +126,7 @@ class VariationalEmpowerment(EmpowermentStrategy):
                 E = self.compute(world, T, n_step)
                 (fig, ax) = plt.subplots(1)
                 world.plot(colorMap=E, figax=(fig, ax))
+                self.plot(world.width, world.height)
                 plt.savefig(f"results/{i}.png")
                 plt.close(fig)
 
@@ -119,19 +134,23 @@ class VariationalEmpowerment(EmpowermentStrategy):
 def one_hot_vector(x, input_dim):
     return torch.zeros(1, input_dim).scatter_(1, x.view(-1, 1), 1)
 
+
 def one_hot_batch_matrix(x, input_dim):
     return torch.nn.functional.one_hot(x, num_classes=input_dim).view(x.shape[0], input_dim)
+
 
 def get_s_next_from_one_hot(T, s_hot, z):
     assert s_hot.shape[1] > 1
     t = (T * s_hot.float()).sum(2)
     return torch.mm(t, z.float().T).T
 
+
 def get_s_next(T, s, z):
     assert s.shape[1] == 1
     idx = s.unsqueeze(0).repeat(T.shape[0], T.shape[1], 1)
     t = T[:, :, :].gather(2, idx)
     return torch.mm(t.squeeze(2), z.T).T
+
 
 def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
     assert s_hot.shape[0] > 1 and z.shape[0] > 1
@@ -147,6 +166,7 @@ def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
 
     out = torch.bmm(batch, z.float()) # out = [n_b, n_s, 1]
     return out.squeeze(2)
+
 
 def get_s_next_from_s_batch_matrix(T, s, z):
     n_s, n_a, _ = T.shape
