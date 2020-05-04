@@ -27,6 +27,22 @@ class Source(nn.Module):
         return F.gumbel_softmax(action_score, hard=True, dim=-1, tau=temp), F.gumbel_softmax(action_score, hard=False, dim=-1, tau=temp)
 
 
+class Input(nn.Module):
+    def __init__(self, input_dim, action_dim):
+        super(Input, self).__init__()
+        self.input_dim = input_dim
+        self.action_dim = action_dim
+        self.fc = nn.Linear(self.input_dim, 200)
+        self.mu_head = nn.Linear(200, self.action_dim)
+        self.sigma_head = nn.Linear(200, self.action_dim)
+
+    def forward(self, x):
+        x = F.relu(self.fc(x))
+        u = torch.tanh(self.mu_head(x))
+        sigma = F.softplus(self.sigma_head(x))
+        return u, sigma
+
+
 class Planner(nn.Module):
     def __init__(self, input_dim, categorical_dim):
         super(Planner, self).__init__()
@@ -47,17 +63,37 @@ class Planner(nn.Module):
         return F.softmax(action_score, dim=-1)
 
 
+class Output(nn.Module):
+    def __init__(self, input_dim, action_dim):
+        super(Output, self).__init__()
+        self.fc = nn.Linear(input_dim, 200)
+        self.fc_ = nn.Linear(input_dim, 200)
+        self.hidden = nn.Linear(400, 400)
+        self.mu_head = nn.Linear(400, action_dim)
+        self.sigma_head = nn.Linear(400, action_dim)
+
+    def forward(self, x, x_):
+        x = F.relu(self.fc(x))
+        x_ = F.relu(self.fc_(x_))
+        cat = torch.cat([x, x_], dim=-1)
+        h = F.relu(self.hidden(cat))
+        u = torch.tanh(self.mu_head(h))
+        sigma = F.softplus(self.sigma_head(h))
+        return u, sigma
+
+
 class VariationalEmpowerment(EmpowermentStrategy):
     max_grad_norm = .5
     temp_min = 1
-    anneal_rate = 3e-7
+    anneal_rate = 3e-7#0.00003
     temp = 1.
-
     def __init__(self, n_s, n_a, n_step):
         self.input_dim = n_s
         self.n_step = n_step
-        self.source = Source(n_s, n_a**n_step).to(device)
-        self.planner = Planner(n_s, n_a**n_step).to(device)
+        # self.source = Source(n_s, n_a**n_step).to(device)
+        # self.planner = Planner(n_s, n_a**n_step).to(device)
+        self.source = Input(2, 2**n_step).to(device)
+        self.planner = Output(2, 2**n_step).to(device)
         self.params = list(self.source.parameters()) + list(self.planner.parameters())
         self.optimizer = optim.Adam(self.params, lr=3e-4)
         self.action_list = torch.from_numpy(np.arange(n_a**n_step)).float().view(1, -1).to(device)
@@ -76,20 +112,31 @@ class VariationalEmpowerment(EmpowermentStrategy):
 
         for _ in range(n_samples):
             with torch.no_grad():
-                z, prob = self.source.forward(S_hot)
-                s_ = get_s_next_from_s_batch_matrix(T, S, z)
-                prob_ = self.planner.forward(S_hot, s_)
-                avg += (torch.mul(prob_, z.detach()).sum(1) - torch.mul(prob, z).sum(1)).view(world.dims)
+                C = self._index_to_cell(S, world.dims[0], world.dims[1])
+                mu, sigma = self.source.forward(C)
+                gaussian = Normal(mu, sigma)
+                sample = gaussian.rsample()
+                C_ = C.clone()
+                for i in range(self.n_step):
+                    C_ += sample[:,  i * 2: i * 2 + 2]
+                mu_, sigma_ = self.planner.forward(C, C_)
+                gaussian_ = Normal(mu_, sigma_)
+                avg += ((gaussian_.log_prob(sample) - gaussian.log_prob(sample)).view(-1, self.n_step, 2).sum(1).sum(1)).view(world.dims) / 2 ** self.n_step
+
+                # z, prob = self.source.forward(S_hot)
+                # s_ = get_s_next_from_s_batch_matrix(T, S, z)
+                # prob_ = self.planner.forward(S_hot, s_)
+                # avg += (torch.mul(prob_, z.detach()).sum(1) - torch.mul(prob, z).sum(1)).view(world.dims)
 
         E = avg / n_samples #torch.log2(avg / n_samples)
-        self.q_x = prob.transpose(1, 0).cpu().numpy()
+        self.q_x = np.zeros((E.shape[0], E.shape[0]))#prob.transpose(1, 0).cpu().numpy()
         return E.cpu().numpy()
 
     def _index_to_cell(self, s, height, width):
         cell = torch.stack([s // width, s % width], dim=1).float()
         return cell.squeeze(2)
 
-    def train_batch(self, world, T, n_step, n_samples=int(5e4)):
+    def train_batch(self, world, T, n_step, n_samples=int(5e5)):
         """
          Compute the empowerment of a grid world with neural networks
          See eq 3 and 5 of https: // arxiv.org / pdf / 1710.05101.pdf
@@ -99,18 +146,31 @@ class VariationalEmpowerment(EmpowermentStrategy):
 
         T = torch.from_numpy(Bn).float().to(device)
         states = torch.arange(n_states).view(-1, 1).to(device)
+        states = self._index_to_cell(states, world.dims[0], world.dims[1])
         start = time.time()
         for i in range(n_samples):
             if i % 100 == 0 and i != 0: self.temp = np.maximum(self.temp * np.exp(-self.anneal_rate * i), self.temp_min)
-            S = states[torch.randperm(states.size()[0])]
-            S_hot = one_hot_batch_matrix(S, self.input_dim).float()
-            Z, prob = self.source.forward(S_hot.float(), self.temp)
+            #S = states[torch.randperm(states.size()[0])]
+            #S_hot = one_hot_batch_matrix(S, self.input_dim).float()
+            #Z, prob = self.source.forward(S_hot.float(), self.temp)
+            C = states[torch.randperm(states.size()[0])]
 
-            S_ = get_s_next_from_s_batch_matrix(T, S, Z)
-            prob_ = self.planner.forward(S_hot, S_.detach())
+            mu, sigma = self.source.forward(C)
+            gaussian = Normal(mu, sigma)
+            sample = gaussian.sample()
+            C_ = C.clone()
+            for j in range(self.n_step):
+                C_ += sample[:, j*2:j*2+2]
+                torch.clamp(C_, max=world.dims[0], min=0.)
 
+            #S_ = get_s_next_from_s_batch_matrix(T, S, Z)
+            #prob_ = self.planner.forward(S_hot, S_.detach())
+            mu_, sigma_ = self.planner.forward(C, C_)
+            gaussian_ = Normal(mu_, sigma_)
             self.optimizer.zero_grad()
-            error = -torch.mul(prob_, Z.detach()).sum(1) + torch.mul(prob, Z).sum(1)
+            #error = -torch.mul(prob_, Z.detach()).sum(1) + torch.mul(prob, Z).sum(1)
+            error = ((mu_ - mu)**2).view(-1, self.n_step, 2).sum(1)
+
             loss = error.mean()
             loss.backward()
             nn.utils.clip_grad_norm_(self.params, self.max_grad_norm)
