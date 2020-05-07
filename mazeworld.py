@@ -104,69 +104,81 @@ class MazeWorld(World):
             ax.set_title(str(action))
 
 
-def klyubin_world():
-    """ Build mazeworld from Klyubin et al. """
-    maze = MazeWorld(10,10)
-    # wall A 
-    for i in range(6):
-        maze.add_wall( (1, i), "N" )
-    # wall B & D 
-    for i in range(2):
-        maze.add_wall( (i+2, 5), "E")
-        maze.add_wall( (i+2, 6), "E")
-    # wall C
-    maze.add_wall( (3, 6), "N")
-    # wall E
-    for i in range(2):
-        maze.add_wall( (1, i+7), "N")
-    # wall F 
-    for i in range(3):
-        maze.add_wall( (5, i+2), "N")
-    # wall G 
-    for i in range(2):
-        maze.add_wall( (i+6, 5), "W")
-    # walls HIJK
-    maze.add_wall( (6, 4), "N")
-    maze.add_wall( (7, 4), "N")
-    maze.add_wall( (8, 4), "W")
-    maze.add_wall( (8, 3), "N")
-    return maze
+class WorldFactory(object):
+    def create_maze_world(self, w, h):
+        return MazeWorld(w, h)
 
-def door_world():
-    """ Grid world used in Experiment 2 """
-    maze = MazeWorld(height= 6, width = 9)
-    for i in range(maze.dims[0]):
-        if i is not 3:
-            maze.add_wall( (i, 6), "W")
-    for j in range(6):
-        if j is not 0:
-            maze.add_wall( (2 , j), "N")
-    maze.add_wall((2,2), "E")
-    maze.add_wall((0,2), "E")
-    return maze
+    def klyubin_world(self):
+        """ Build mazeworld from Klyubin et al. """
+        maze = self.create_maze_world(10,10)
+        # wall A
+        for i in range(6):
+            maze.add_wall( (1, i), "N" )
+        # wall B & D
+        for i in range(2):
+            maze.add_wall( (i+2, 5), "E")
+            maze.add_wall( (i+2, 6), "E")
+        # wall C
+        maze.add_wall( (3, 6), "N")
+        # wall E
+        for i in range(2):
+            maze.add_wall( (1, i+7), "N")
+        # wall F
+        for i in range(3):
+            maze.add_wall( (5, i+2), "N")
+        # wall G
+        for i in range(2):
+            maze.add_wall( (i+6, 5), "W")
+        # walls HIJK
+        maze.add_wall( (6, 4), "N")
+        maze.add_wall( (7, 4), "N")
+        maze.add_wall( (8, 4), "W")
+        maze.add_wall( (8, 3), "N")
+        return maze
 
-def tunnel_world():
-    """ Grid world used in Experiment 3 """
-    maze = MazeWorld(height= 5, width = 9)
-    # vertical walls 
-    for i in range(maze.dims[0]):
-        if i is not 2:
-            maze.add_wall( (i, 6), "W")
-            maze.add_wall( (i, 2), "W")
-    # tunnel walls 
-    for j in range(2,6):
-            maze.add_wall( (2 , j), "N")
-            maze.add_wall( (2, j), "S")
-    return maze
+    def door_world(self):
+        """ Grid world used in Experiment 2 """
+        maze = MazeWorld(height= 6, width = 9)
+        for i in range(maze.dims[0]):
+            if i is not 3:
+                maze.add_wall( (i, 6), "W")
+        for j in range(6):
+            if j is not 0:
+                maze.add_wall( (2 , j), "N")
+        maze.add_wall((2,2), "E")
+        maze.add_wall((0,2), "E")
+        return maze
 
-def step_world():
-    n = 7
-    maze = MazeWorld(n,n, toroidal=False)
-    centre = np.array([(n-1)/2]*2, dtype = int)
-    for i in (centre + [-1,+1]):
-        for d in ['W','E']:
-            maze.add_wall([i,centre[1]], d)
-    for j in (centre + [-1,+1]):
-        for d in ['N','S']:
-            maze.add_wall([centre[0],j], d)
-    return maze
+    def door2_world(self):
+        maze = MazeWorld(8, 8)
+        for i in range(maze.width):
+            if i is not 6: maze.add_wall([2, i], "N")
+        for i in range(maze.width):
+            if i is not 2: maze.add_wall([5, i], "N")
+        return maze
+
+    def tunnel_world(self):
+        """ Grid world used in Experiment 3 """
+        maze = MazeWorld(height= 5, width = 9)
+        # vertical walls
+        for i in range(maze.dims[0]):
+            if i is not 2:
+                maze.add_wall( (i, 6), "W")
+                maze.add_wall( (i, 2), "W")
+        # tunnel walls
+        for j in range(2,6):
+                maze.add_wall( (2 , j), "N")
+                maze.add_wall( (2, j), "S")
+        return maze
+
+    def step_world(self):
+        n = 7
+        maze = MazeWorld(n,n, toroidal=False)
+        centre = np.array([(n-1)/2]*2, dtype = int)
+        for i in (centre + [-1,+1]):
+            for d in ['W','E']:
+                maze.add_wall([i,centre[1]], d)
+        for j in (centre + [-1,+1]):
+            for d in ['N','S']:
+                maze.add_wall([centre[0],j], d)
+        return maze

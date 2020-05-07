@@ -1,5 +1,6 @@
 import mazeworld
-from mazeworld import MazeWorld, klyubin_world, door_world, step_world, tunnel_world
+from mazeworld import MazeWorld, WorldFactory
+from multiworld import MultiWorldFactory
 from pendulum import Pendulum
 from empowerment import BlahutArimoto, VisitCount, BlahutArimotoTimeOptimal, VisitCountFast
 from agent import EmpMaxAgent
@@ -13,23 +14,8 @@ def example_1():
     """
     n_step = 5
     strategy = BlahutArimoto()
-    maze = MazeWorld(10, 10)
-    for i in range(6):
-        maze.add_wall( (1, i), "N" )
-    for i in range(2):
-        maze.add_wall( (i+2, 5), "E")
-        maze.add_wall( (i+2, 6), "E")
-    maze.add_wall( (3, 6), "N")
-    for i in range(2):
-        maze.add_wall( (1, i+7), "N")
-    for i in range(3):
-        maze.add_wall( (5, i+2), "N")
-    for i in range(2):
-        maze.add_wall( (i+6, 5), "W")
-    maze.add_wall( (6, 4), "N")
-    maze.add_wall( (7, 4), "N")
-    maze.add_wall( (8, 4), "W")
-    maze.add_wall( (8, 3), "N")
+    f = WorldFactory()
+    maze = f.klyubin_world()
     # compute the 5-step empowerment at each cell
     T = maze.compute_model()
     start = time.time()
@@ -43,12 +29,8 @@ def example_1():
 
 def example_2():
     """ builds grid world with doors and plots empowerment landscape """
-    maze = MazeWorld(8,8)
-    strategy = VisitCountFast()
-    for i in range(maze.width):
-        if i is not 6 : maze.add_wall([2, i], "N")
-    for i in range(maze.width):
-        if i is not 2 : maze.add_wall([5, i], "N")
+    f = WorldFactory()
+    maze = f.door2_world()
     n_step = 4
     T = maze.compute_model()
     start = time.time()
@@ -64,7 +46,8 @@ def example_3():
     """ Runs empowerment maximising agent running in a chosen grid world """
     # maze
     n_step = 3
-    maze = mazeworld.door_world() # klyubin_world(), tunnel_world()
+    f = WorldFactory()
+    maze = f.door_world() # klyubin_world(), tunnel_world()
     B = maze.compute_model()
     strategy = VisitCountFast()
     E = strategy.compute(world=maze, T=B, n_step=n_step).reshape(-1)
@@ -167,38 +150,53 @@ def example_5():
     plt.show()
     #plt.savefig("results/finalE.png")
 
-
 def example_6():
     """ compute empowerment landscape for multiple agents"""
-    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))
+    fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(8, 8))
     n_step = 3
     strategy = VisitCount()
+    f = WorldFactory()
 
-    klyubin = klyubin_world()
+    klyubin = f.klyubin_world()
     T = klyubin.compute_model()
     E = strategy.compute(world=klyubin, T=T, n_step=n_step)
     klyubin.plot(fig, ax[0, 0], colorMap=E)
     ax[0, 0].set_title(f'{n_step}-step klyubin')
 
-    door = door_world()
+    door = f.door_world()
     T = door.compute_model()
     E = strategy.compute(world=door, T=T, n_step=n_step)
     door.plot(fig, ax[1, 0], colorMap=E)
     ax[1, 0].set_title(f'{n_step}-step door')
 
-    step = step_world()
+    door = f.door2_world()
+    T = door.compute_model()
+    E = strategy.compute(world=door, T=T, n_step=n_step)
+    door.plot(fig, ax[2, 0], colorMap=E)
+    ax[2, 0].set_title(f'{n_step}-step door2')
+
+    step = f.step_world()
     T = step.compute_model()
     E = strategy.compute(world=step, T=T, n_step=n_step)
     step.plot(fig, ax[0, 1], colorMap=E)
     ax[0, 1].set_title(f'{n_step}-step step')
 
-    tunnel = tunnel_world()
+    tunnel = f.tunnel_world()
     T = tunnel.compute_model()
     E = strategy.compute(world=tunnel, T=T, n_step=n_step)
     tunnel.plot(fig, ax[1, 1], colorMap=E)
-    ax[0, 1].set_title(f'{n_step}-step tunnel')
+    ax[1, 1].set_title(f'{n_step}-step tunnel')
+
+    f = MultiWorldFactory()
+    multiagent = f.klyubin_world_multi()
+    T = multiagent.compute_model()
+    E = strategy.compute(world=multiagent, T=T, n_step=n_step)
+    multiagent.plot(fig, ax[2, 1], colorMap=E)
+    ax[2, 1].set_title(f'{n_step}-step multiagent')
 
     plt.show()
+
+
 
 
 if __name__ == "__main__":
