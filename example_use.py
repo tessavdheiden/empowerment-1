@@ -1,5 +1,5 @@
 import mazeworld
-from mazeworld import MazeWorld, klyubin_world, door_world
+from mazeworld import MazeWorld, klyubin_world, door_world, step_world, tunnel_world
 from pendulum import Pendulum
 from empowerment import BlahutArimoto, VisitCount, BlahutArimotoTimeOptimal, VisitCountFast
 from agent import EmpMaxAgent
@@ -35,8 +35,9 @@ def example_1():
     start = time.time()
     E = strategy.compute(world=maze, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
     # plot the maze world
-    maze.plot(colorMap=E)
+    maze.plot(fig, ax, colorMap=E)
     plt.title(f'{n_step}-step empowerment')
     plt.show()
 
@@ -54,7 +55,8 @@ def example_2():
     E = strategy.compute(world=maze, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     # plot the maze world
-    maze.plot(colorMap=E)
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
+    maze.plot(fig, ax, colorMap=E)
     plt.title(f'{n_step}-step empowerment')
     plt.show()
 
@@ -97,51 +99,54 @@ def example_3():
         agent.update(s,a,s_)
         s = s_
     print("elapsed seconds: %0.3f" % (time.time() - start) )
-
     # some plotting
-    plt.figure(1)
-    plt.title("value and action map")
+    fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(9, 9))
     Vmap = agent.value_map.reshape(*maze.dims)
-    maze.plot(colorMap= Vmap )
-    Amap = agent.action_map
-    U = np.array([(1 if a == 2 else (-1 if a == 3 else 0)) for a in Amap]).reshape(maze.height, maze.width)
-    V = np.array([(1 if a == 0 else (-1 if a == 1 else 0)) for a in Amap]).reshape(maze.height, maze.width)
-    plt.quiver(np.arange(maze.width) + .5, np.arange(maze.height) + .5, U, V)
-    plt.figure(2)
-    plt.title("subjective empowerment")
-    maze.plot(colorMap= agent.E.reshape(*maze.dims))
-    plt.figure(3)
-    plt.title("tau")
-    plt.plot(tau)
-    plt.figure(4)
-    plt.scatter(agent.E, visited.reshape(n_s))
-    plt.xlabel('true empowerment')
-    plt.ylabel('visit frequency')
-    plt.figure(5)
-    plt.title("visited")
-    maze.plot(colorMap=visited.reshape(*maze.dims))
-    fig, ax1 = plt.subplots()
+    maze.plot(fig, ax[0, 0], colorMap= Vmap)
+    ax[0, 0].set_title('value map')
+    # Amap = agent.action_map
+    # U = np.array([(1 if a == 2 else (-1 if a == 3 else 0)) for a in Amap]).reshape(maze.height, maze.width)
+    # V = np.array([(1 if a == 0 else (-1 if a == 1 else 0)) for a in Amap]).reshape(maze.height, maze.width)
+    # plt.quiver(np.arange(maze.width) + .5, np.arange(maze.height) + .5, U, V)
+
+    maze.plot(fig, ax[0, 1], colorMap= agent.E.reshape(*maze.dims))
+    ax[0, 1].set_title('subjective empowerment')
+
+    ax[0, 2].set_title("tau")
+    ax[0, 2].plot(tau)
+
+    ax[1, 0].scatter(agent.E, visited.reshape(n_s))
+    ax[1, 0].set_xlabel('true empowerment')
+    ax[1, 0].set_ylabel('visit frequency')
+
+    maze.plot(fig, ax[1,1], colorMap=visited.reshape(*maze.dims))
+    ax[1, 1].set_title('visited')
+
     red = 'tab:red'
-    ax1.set_xlabel('time')
-    ax1.set_ylabel('MSE of empowerment map', color=red)
-    ax1.plot(D_emp, color=red)
-    ax1.tick_params(axis='y', labelcolor=red)
-    ax2 = ax1.twinx()
-    ax2.set_ylabel('Model disagreement', color='tab:blue')
-    ax2.plot(D_mod, color='tab:blue')
-    ax2.tick_params(axis='y', labelcolor='tab:blue')
+    ax[1, 2].plot(D_emp, color=red)
+    ax[1, 2].set_xlabel('time')
+    ax[1, 2].set_ylabel('MSE of empowerment map', color=red)
+    ax[1, 2].tick_params(axis='y', labelcolor=red)
+
+    ax[2, 1] = ax[1, 2].twinx()
+    ax[2, 1].set_ylabel('Model disagreement', color='tab:blue')
+    ax[2, 1].plot(D_mod, color='tab:blue')
+    ax[2, 1].tick_params(axis='y', labelcolor='tab:blue')
     plt.show()
 
 def example_4():
     """ builds pendulum according to https://github.com/openai/gym/wiki/Pendulum-v0
     """
     pendulum = Pendulum(9,15)
-    strategy = VisitCount()
+    strategy = VisitCountFast()
+    start = time.time()
     T = pendulum.compute_model()
     n_step = 5
     E = strategy.compute(world=pendulum, T=T, n_step=n_step)
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
     # plot the landscape
-    pendulum.plot(colorMap=E)
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
+    pendulum.plot(fig, ax, colorMap=E)
     plt.title(f'{n_step}-step empowerment')
     plt.show()
 
@@ -152,13 +157,48 @@ def example_5():
     start = time.time()
     T = maze.compute_model()
     strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
-    #strategy = BlahutArimoto()
-    strategy.train_batch(world=maze, T=T, n_step=n_step)
+    strategy = BlahutArimoto()
+    #strategy.train_batch(world=maze, T=T, n_step=n_step)
     E = strategy.compute(world=maze, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
-    maze.plot(colorMap=E)
-    plt.title('%i-step empowerment' % n_step)
-    plt.savefig("results/finalE.png")
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7, 5))
+    maze.plot(fig, ax, colorMap=E)
+    ax.set_title('%i-step empowerment' % n_step)
+    plt.show()
+    #plt.savefig("results/finalE.png")
+
+
+def example_6():
+    """ compute empowerment landscape for multiple agents"""
+    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))
+    n_step = 3
+    strategy = VisitCount()
+
+    klyubin = klyubin_world()
+    T = klyubin.compute_model()
+    E = strategy.compute(world=klyubin, T=T, n_step=n_step)
+    klyubin.plot(fig, ax[0, 0], colorMap=E)
+    ax[0, 0].set_title(f'{n_step}-step klyubin')
+
+    door = door_world()
+    T = door.compute_model()
+    E = strategy.compute(world=door, T=T, n_step=n_step)
+    door.plot(fig, ax[1, 0], colorMap=E)
+    ax[1, 0].set_title(f'{n_step}-step door')
+
+    step = step_world()
+    T = step.compute_model()
+    E = strategy.compute(world=step, T=T, n_step=n_step)
+    step.plot(fig, ax[0, 1], colorMap=E)
+    ax[0, 1].set_title(f'{n_step}-step step')
+
+    tunnel = tunnel_world()
+    T = tunnel.compute_model()
+    E = strategy.compute(world=tunnel, T=T, n_step=n_step)
+    tunnel.plot(fig, ax[1, 1], colorMap=E)
+    ax[0, 1].set_title(f'{n_step}-step tunnel')
+
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -168,4 +208,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_5()
+    example_6()

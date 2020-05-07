@@ -78,12 +78,11 @@ class MazeWorld(World):
             s = self.act(s, a)
         return s
     
-    def plot(self, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None, figax=plt.subplots(1)):
+    def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None):
         G = np.zeros(self.dims) if colorMap is None else colorMap.copy()
-        fig, ax = figax
         # plot color map
         if vmax is not None:
-            im = ax.pcolor(G, vmin=vmin, vmax=vmax) # , cmap = 'Greys')
+            im = plt.pcolor(G, vmin=vmin, vmax=vmax) # , cmap = 'Greys')
         else:
             im = ax.pcolor(G)
         fig.colorbar(im, ax=ax)
@@ -99,14 +98,7 @@ class MazeWorld(World):
             ax.scatter([x[-1]], [y[-1]], s = 100, c = 'r')
         for wall in self.walls:
             y, x = zip(*wall)
-            if x[0] == x[1]:
-                # horizontal wall 
-                x = [x[0], x[0] + 1]
-                y = [max(y), max(y)]
-            else:
-                # vertical wall
-                x = [max(x), max(x)]
-                y = [y[0], y[0] + 1]
+            (y, x) = ([max(y), max(y)], [x[0], x[0] + 1]) if x[0] == x[1] else ([y[0], y[0] + 1], [max(x), max(x)])
             ax.plot(x, y, c = 'w')
         if action is not None:
             ax.set_title(str(action))

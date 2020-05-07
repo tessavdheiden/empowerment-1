@@ -69,30 +69,33 @@ class Pendulum(World):
         new_state = self.vecmod(new_state, self.dims)
         return self._cell_to_index(new_state)
 
-    def plot(self, pos = None, traj = None, action = None, colorMap = None, vmin = None, vmax = None):
+    def plot(self, fig, ax, pos = None, traj = None, action = None, colorMap = None, vmin = None, vmax = None):
         G = np.zeros(self.dims) if colorMap is None else colorMap.copy()
         # plot color map
         if vmax is not None:
-            plt.pcolor(G, vmin = vmin, vmax=vmax) # , cmap = 'Greys')
+            im = ax.pcolor(G, vmin = vmin, vmax=vmax) # , cmap = 'Greys')
         else:
-            plt.pcolor(G)
-        plt.colorbar()
+            im = ax.pcolor(G)
+        fig.colorbar(im, ax=ax)
         if pos is not None:
-            plt.scatter([pos[1] + 0.5], [pos[0] + 0.5], s = 100, c = 'w')
+            ax.scatter([pos[1] + 0.5], [pos[0] + 0.5], s = 100, c = 'w')
         # plot trajectory
         if traj is not None:
             y, x = zip(*traj)
             y = np.array(y) + 0.5
             x = np.array(x) + 0.5
-            plt.plot(x, y)
-            plt.scatter([x[0]], [y[0]], s = 100, c = 'b')
-            plt.scatter([x[-1]], [y[-1]], s = 100, c = 'r')
+            ax.plot(x, y)
+            ax.scatter([x[0]], [y[0]], s = 100, c = 'b')
+            ax.scatter([x[-1]], [y[-1]], s = 100, c = 'r')
 
         if action is not None:
-            plt.title(str(action))
+            ax.set_title(str(action))
 
-        plt.xticks(np.linspace(0, len(self.angles), 3), [r'$-\pi$', '0', r'$\pi$'])
-        plt.yticks(np.linspace(0, len(self.velocities), 3), np.round(np.linspace(self.velocities[0], self.velocities[-1], 3)))
+        ax.set_xticks(np.linspace(0, len(self.angles), 3))
+        ax.set_xticklabels([r'$-\pi$', '0', r'$\pi$'])
+        ax.set_xlabel('angle')
+        ax.set_yticks(np.linspace(0, len(self.velocities), 3))
+        ax.set_yticklabels(np.round(np.linspace(self.velocities[0], self.velocities[-1], 3)))
 
 def angle_normalize(x):
     return ((x + np.pi) % (2 * np.pi)) - np.pi
