@@ -1,4 +1,3 @@
-import mazeworld
 from mazeworld import MazeWorld, WorldFactory
 from multiworld import MultiWorldFactory
 from pendulum import Pendulum
@@ -153,8 +152,8 @@ def example_5():
 def example_6():
     """ compute empowerment landscape for multiple agents"""
     fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(8, 8))
-    n_step = 3
-    strategy = VisitCount()
+    n_step = 2
+    strategy = VisitCountFast()
     f = WorldFactory()
 
     klyubin = f.klyubin_world()
@@ -162,36 +161,42 @@ def example_6():
     E = strategy.compute(world=klyubin, T=T, n_step=n_step)
     klyubin.plot(fig, ax[0, 0], colorMap=E)
     ax[0, 0].set_title(f'{n_step}-step klyubin')
-
-    door = f.door_world()
-    T = door.compute_model()
-    E = strategy.compute(world=door, T=T, n_step=n_step)
-    door.plot(fig, ax[1, 0], colorMap=E)
-    ax[1, 0].set_title(f'{n_step}-step door')
-
-    door = f.door2_world()
-    T = door.compute_model()
-    E = strategy.compute(world=door, T=T, n_step=n_step)
-    door.plot(fig, ax[2, 0], colorMap=E)
-    ax[2, 0].set_title(f'{n_step}-step door2')
-
-    step = f.step_world()
-    T = step.compute_model()
-    E = strategy.compute(world=step, T=T, n_step=n_step)
-    step.plot(fig, ax[0, 1], colorMap=E)
-    ax[0, 1].set_title(f'{n_step}-step step')
-
-    tunnel = f.tunnel_world()
-    T = tunnel.compute_model()
-    E = strategy.compute(world=tunnel, T=T, n_step=n_step)
-    tunnel.plot(fig, ax[1, 1], colorMap=E)
-    ax[1, 1].set_title(f'{n_step}-step tunnel')
-
+    #
+    # door = f.door_world()
+    # T = door.compute_model()
+    # E = strategy.compute(world=door, T=T, n_step=n_step)
+    # door.plot(fig, ax[1, 0], colorMap=E)
+    # ax[1, 0].set_title(f'{n_step}-step door')
+    #
+    # door = f.door2_world()
+    # T = door.compute_model()
+    # E = strategy.compute(world=door, T=T, n_step=n_step)
+    # door.plot(fig, ax[2, 0], colorMap=E)
+    # ax[2, 0].set_title(f'{n_step}-step door2')
+    #
+    # step = f.step_world()
+    # T = step.compute_model()
+    # E = strategy.compute(world=step, T=T, n_step=n_step)
+    # step.plot(fig, ax[0, 1], colorMap=E)
+    # ax[0, 1].set_title(f'{n_step}-step step')
+    #
+    # tunnel = f.tunnel_world()
+    # T = tunnel.compute_model()
+    # E = strategy.compute(world=tunnel, T=T, n_step=n_step)
+    # tunnel.plot(fig, ax[1, 1], colorMap=E)
+    # ax[1, 1].set_title(f'{n_step}-step tunnel')
     f = MultiWorldFactory()
     multiagent = f.klyubin_world_multi()
     T = multiagent.compute_model()
-    E = strategy.compute(world=multiagent, T=T, n_step=n_step)
-    multiagent.plot(fig, ax[2, 1], colorMap=E)
+    E_ = strategy.compute(world=multiagent, T=T, n_step=n_step)
+    multiagent.plot(fig, ax[2, 0], colorMap=E_, vmin=0, vmax=np.max(E))
+    ax[2, 1].set_title(f'{n_step}-step multiagent')
+
+    f = MultiWorldFactory()
+    multiagent = f.klyubin_world_multi()
+    T = multiagent.influence_on_other()
+    E_ = strategy.compute(world=multiagent, T=T, n_step=n_step)
+    multiagent.plot(fig, ax[2, 1], colorMap=E_, vmin=0, vmax=np.max(E))
     ax[2, 1].set_title(f'{n_step}-step multiagent')
 
     plt.show()
