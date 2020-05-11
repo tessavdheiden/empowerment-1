@@ -44,7 +44,7 @@ def example_2():
 def example_3():
     """ Runs empowerment maximising agent running in a chosen grid world """
     # maze
-    n_step = 3
+    n_step = 1
     f = WorldFactory()
     maze = f.door_world() # klyubin_world(), tunnel_world()
     B = maze.compute_model()
@@ -69,6 +69,7 @@ def example_3():
     tau = np.zeros(steps)
     D_emp = np.zeros(steps)
     D_mod = n_s*n_a*np.ones(steps)
+    traj = []
     for t in range(steps):
         # append data for plotting
         tau[t] = agent.tau
@@ -76,15 +77,16 @@ def example_3():
         D_mod[t] = D_mod[t] - np.sum(np.argmax(agent.T, axis=0) == np.argmax(B, axis=0))
         a = agent.act(s)
         pos = maze._index_to_cell(s)
+        traj.append(pos)
         visited[pos[0],pos[1]] += 1
         s_ = maze.act(s,list(maze.actions.keys())[a])
         agent.update(s,a,s_)
         s = s_
     print("elapsed seconds: %0.3f" % (time.time() - start) )
     # some plotting
-    fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(9, 9))
+    fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(9, 3))
     Vmap = agent.value_map.reshape(*maze.dims)
-    maze.plot(fig, ax[0, 0], colorMap= Vmap)
+    maze.plot(fig, ax[0, 0], colorMap= Vmap, traj=traj)
     ax[0, 0].set_title('value map')
     # Amap = agent.action_map
     # U = np.array([(1 if a == 2 else (-1 if a == 3 else 0)) for a in Amap]).reshape(maze.height, maze.width)
@@ -110,10 +112,10 @@ def example_3():
     ax[1, 2].set_ylabel('MSE of empowerment map', color=red)
     ax[1, 2].tick_params(axis='y', labelcolor=red)
 
-    ax[2, 1] = ax[1, 2].twinx()
-    ax[2, 1].set_ylabel('Model disagreement', color='tab:blue')
-    ax[2, 1].plot(D_mod, color='tab:blue')
-    ax[2, 1].tick_params(axis='y', labelcolor='tab:blue')
+    ax[1, 2] = ax[1, 2].twinx()
+    ax[1, 2].set_ylabel('Model disagreement', color='tab:blue')
+    ax[1, 2].plot(D_mod, color='tab:blue')
+    ax[1, 2].tick_params(axis='y', labelcolor='tab:blue')
     plt.show()
 
 def example_4():
@@ -152,8 +154,8 @@ def example_5():
 def example_6():
     """ compute empowerment landscape for multiple agents"""
     fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(8, 8))
-    n_step = 2
-    strategy = VisitCountFast()
+    n_step = 3
+    strategy = VisitCount()
     f = WorldFactory()
 
     klyubin = f.klyubin_world()
@@ -161,44 +163,74 @@ def example_6():
     E = strategy.compute(world=klyubin, T=T, n_step=n_step)
     klyubin.plot(fig, ax[0, 0], colorMap=E)
     ax[0, 0].set_title(f'{n_step}-step klyubin')
-    #
-    # door = f.door_world()
-    # T = door.compute_model()
-    # E = strategy.compute(world=door, T=T, n_step=n_step)
-    # door.plot(fig, ax[1, 0], colorMap=E)
-    # ax[1, 0].set_title(f'{n_step}-step door')
-    #
-    # door = f.door2_world()
-    # T = door.compute_model()
-    # E = strategy.compute(world=door, T=T, n_step=n_step)
-    # door.plot(fig, ax[2, 0], colorMap=E)
-    # ax[2, 0].set_title(f'{n_step}-step door2')
-    #
-    # step = f.step_world()
-    # T = step.compute_model()
-    # E = strategy.compute(world=step, T=T, n_step=n_step)
-    # step.plot(fig, ax[0, 1], colorMap=E)
-    # ax[0, 1].set_title(f'{n_step}-step step')
-    #
-    # tunnel = f.tunnel_world()
-    # T = tunnel.compute_model()
-    # E = strategy.compute(world=tunnel, T=T, n_step=n_step)
-    # tunnel.plot(fig, ax[1, 1], colorMap=E)
-    # ax[1, 1].set_title(f'{n_step}-step tunnel')
+
+    door = f.door_world()
+    T = door.compute_model()
+    E = strategy.compute(world=door, T=T, n_step=n_step)
+    door.plot(fig, ax[1, 0], colorMap=E)
+    ax[1, 0].set_title(f'{n_step}-step door')
+
+    door = f.door2_world()
+    T = door.compute_model()
+    E = strategy.compute(world=door, T=T, n_step=n_step)
+    door.plot(fig, ax[2, 0], colorMap=E)
+    ax[2, 0].set_title(f'{n_step}-step door2')
+
+    step = f.step_world()
+    T = step.compute_model()
+    E = strategy.compute(world=step, T=T, n_step=n_step)
+    step.plot(fig, ax[0, 1], colorMap=E)
+    ax[0, 1].set_title(f'{n_step}-step step')
+
+    tunnel = f.tunnel_world()
+    T = tunnel.compute_model()
+    E = strategy.compute(world=tunnel, T=T, n_step=n_step)
+    tunnel.plot(fig, ax[1, 1], colorMap=E)
+    ax[1, 1].set_title(f'{n_step}-step tunnel')
+
+    pendulum = Pendulum(9, 15)
+    T = pendulum.compute_model()
+    E = strategy.compute(world=pendulum, T=T, n_step=n_step)
+    pendulum.plot(fig, ax[2, 1], colorMap=E)
+    ax[2, 1].set_title(f'{n_step}-step pendulum')
+
+    plt.show()
+
+
+def example_7():
+    fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 8))
+    n_step = 3
+    strategy = VisitCount()
+    f = WorldFactory()
+
+    door = f.door2_world()
+    T = door.compute_model()
+    E = strategy.compute(world=door, T=T, n_step=n_step)
+    door.plot(fig, ax[0, 0], colorMap=E)
+    ax[0, 0].set_title(f'{n_step}-step door2')
+
+
     f = MultiWorldFactory()
-    multiagent = f.klyubin_world_multi()
+    multiagent = f.door2_world_multi()
     T = multiagent.compute_model()
-    E_ = strategy.compute(world=multiagent, T=T, n_step=n_step)
-    multiagent.plot(fig, ax[2, 0], colorMap=E_, vmin=0, vmax=np.max(E))
-    ax[2, 1].set_title(f'{n_step}-step multiagent')
+    E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=n_step)
+    multiagent.plot(fig, ax[1, 0], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
+    ax[1, 0].set_title(f'{n_step}-step multiagent')
+    #
+    # E_ = strategy.compute(world=multiagent, T=T[:, 1], n_step=n_step)
+    # multiagent.plot(fig, ax[1, 1], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
+    # ax[1, 1].set_title(f'{n_step}-step multiagent')
 
-    f = MultiWorldFactory()
-    multiagent = f.klyubin_world_multi()
-    T = multiagent.influence_on_other()
-    E_ = strategy.compute(world=multiagent, T=T, n_step=n_step)
-    multiagent.plot(fig, ax[2, 1], colorMap=E_, vmin=0, vmax=np.max(E))
-    ax[2, 1].set_title(f'{n_step}-step multiagent')
-
+    # f = MultiWorldFactory()
+    # multiagent = f.klyubin_world_multi()
+    # T = multiagent.influence_on_other()
+    # E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=n_step)
+    # multiagent.plot(fig, ax[2, 0], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
+    # ax[2, 0].set_title(f'{n_step}-step multiagent')
+    #
+    # E_ = strategy.compute(world=multiagent, T=T[:, 1], n_step=n_step)
+    # multiagent.plot(fig, ax[2, 1], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
+    # ax[2, 1].set_title(f'{n_step}-step multiagent')
     plt.show()
 
 

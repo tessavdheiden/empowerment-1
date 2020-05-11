@@ -105,8 +105,8 @@ class MazeWorld(World):
 
 
 class WorldFactory(object):
-    def create_maze_world(self, w, h):
-        return MazeWorld(w, h)
+    def create_maze_world(self, height, width):
+        return MazeWorld(height, width)
 
     def klyubin_world(self):
         """ Build mazeworld from Klyubin et al. """
@@ -138,7 +138,7 @@ class WorldFactory(object):
 
     def door_world(self):
         """ Grid world used in Experiment 2 """
-        maze = MazeWorld(height= 6, width = 9)
+        maze = self.create_maze_world(height= 6, width = 9)
         for i in range(maze.dims[0]):
             if i is not 3:
                 maze.add_wall( (i, 6), "W")
@@ -150,7 +150,7 @@ class WorldFactory(object):
         return maze
 
     def door2_world(self):
-        maze = MazeWorld(8, 8)
+        maze = self.create_maze_world(8, 8)
         for i in range(maze.width):
             if i is not 6: maze.add_wall([2, i], "N")
         for i in range(maze.width):
@@ -159,7 +159,7 @@ class WorldFactory(object):
 
     def tunnel_world(self):
         """ Grid world used in Experiment 3 """
-        maze = MazeWorld(height= 5, width = 9)
+        maze = self.create_maze_world(height= 5, width = 9)
         # vertical walls
         for i in range(maze.dims[0]):
             if i is not 2:
@@ -173,7 +173,7 @@ class WorldFactory(object):
 
     def step_world(self):
         n = 7
-        maze = MazeWorld(n,n, toroidal=False)
+        maze = self.create_maze_world(n,n)
         centre = np.array([(n-1)/2]*2, dtype = int)
         for i in (centre + [-1,+1]):
             for d in ['W','E']:
