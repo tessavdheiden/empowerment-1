@@ -45,14 +45,15 @@ class MultiWorld(MazeWorld):
         """
         state = self._index_to_cell(s)
         new_state = state + self.actions[a]
-        new_state_ = s_ + self.actions[a_]
-        if self._cell_to_index(state) == self._cell_to_index(s_): # can't be on same cell
+        state_ = self._index_to_cell(s_)
+        new_state_ = state_ + self.actions[a_]
+        if self._cell_to_index(state) == s_: # can't be on same cell
             return True
-        elif a_ not in self.adjacencies[s_[0]][s_[1]] or np.any(new_state_ < np.zeros(2)) or np.any(new_state_ >= self.dims): # the other cannot push if its behind a wall
+        elif a_ not in self.adjacencies[state_[0]][state_[1]] or np.any(new_state_ < np.zeros(2)) or np.any(new_state_ >= self.dims): # the other cannot push if its behind a wall
            return False
-        if self._cell_to_index(new_state) == self._cell_to_index(new_state_ ): # landing on same cell
+        if self._cell_to_index(new_state) == self._cell_to_index(new_state_): # landing on same cell
             return True
-        elif (s == self._cell_to_index(new_state_)) and (self._cell_to_index(new_state) == self._cell_to_index(s_)): # switching places
+        elif (s == self._cell_to_index(new_state_)) and (self._cell_to_index(new_state) == s_): # switching places
             return True
         else:
             return False
@@ -94,8 +95,9 @@ class MultiWorld(MazeWorld):
         for s in range(n_states):
             for k, agent in  enumerate(self.agents):
                 for i, a in enumerate(self.actions.keys()):
-                    s_new = self.act(s, a, agent.position, agent.action)
-                    s_unc = list(map(lambda x : self.act(s, x, agent.position, agent.action), filter(lambda x : x != a, self.actions.keys())))
+                    s_k = self._cell_to_index(agent.position)
+                    s_new = self.act(s, a, s_k, agent.action)
+                    s_unc = list(map(lambda x : self.act(s, x, s_k, agent.action), filter(lambda x : x != a, self.actions.keys())))
                     T[s_new, k, i, s] += det
                     for su in s_unc:
                         T[su, k, i, s] += ((1-det)/len(s_unc))
@@ -118,7 +120,7 @@ class MultiWorld(MazeWorld):
             for k, agent in enumerate(self.agents):
                 for i, a in enumerate(self.actions.keys()):
                     s_k = self._cell_to_index(agent.position)
-                    s_new = self.act(s_k, agent.action, self._index_to_cell(s), a)
+                    s_new = self.act(s_k, agent.action, s, a)
                     T[s_new, k, i, s] += det  # probability of agent_k landing on s' by its action
 
         self.T = T
