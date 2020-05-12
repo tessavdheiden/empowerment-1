@@ -5,7 +5,7 @@ import matplotlib.patches as patches
 
 class Agent(object):
     def __init__(self, position, action):
-        self.postion = position
+        self.position = position
         self.action = action
 
 
@@ -13,13 +13,17 @@ from mazeworld import MazeWorld, WorldFactory
 
 
 class MultiWorldFactory(WorldFactory):
-    def create_maze_world(self, w, h):
-        return MultiWorld(w, h)
+    def create_maze_world(self, height, width):
+        return MultiWorld(height, width)
 
-    def klyubin_world_multi(self):
-        maze = self.klyubin_world()
-        maze.add_agent([5, 6], 'E')
-        maze.add_agent([5, 1], 'N')
+    def door_world_left_right_stay(self):
+        maze = self.left_right_door_world()
+        maze.add_agent([1, 3], '_')
+        return maze
+
+    def door_world_left_right_east(self):
+        maze = self.left_right_door_world()
+        maze.add_agent([4, 3], 'E')
         return maze
 
 class MultiWorld(MazeWorld):
@@ -37,14 +41,18 @@ class MultiWorld(MazeWorld):
 
     def in_collision(self, s, a, s_, a_):
         """ are or will be on same location or move through each other
+        behind wall or off-grid will prevent a collision
         """
         state = self._index_to_cell(s)
         new_state = state + self.actions[a]
-        if self._cell_to_index(state) == self._cell_to_index(s_):
+        new_state_ = s_ + self.actions[a_]
+        if self._cell_to_index(state) == self._cell_to_index(s_): # can't be on same cell
             return True
-        elif self._cell_to_index(new_state) == self._cell_to_index(s_ + self.actions[a_]):
+        elif a_ not in self.adjacencies[s_[0]][s_[1]] or np.any(new_state_ < np.zeros(2)) or np.any(new_state_ >= self.dims): # the other cannot push if its behind a wall
+           return False
+        if self._cell_to_index(new_state) == self._cell_to_index(new_state_ ): # landing on same cell
             return True
-        elif (s == self._cell_to_index(s_ + self.actions[a_])) and (self._cell_to_index(new_state) == self._cell_to_index(s_)):
+        elif (s == self._cell_to_index(new_state_)) and (self._cell_to_index(new_state) == self._cell_to_index(s_)): # switching places
             return True
         else:
             return False
@@ -70,7 +78,7 @@ class MultiWorld(MazeWorld):
             if np.any(new_state < np.zeros(2)) or np.any(new_state >= self.dims):
                 return s
         if self.in_collision(s, a, s_, a_):
-            return s
+            new_state = state + self.actions[a_] if np.any(state + self.actions[a_] >= np.zeros(2)) or np.any(state + self.actions[a_] < self.dims) else state
         return self._cell_to_index(new_state)
 
     def compute_model(self, det=1.):
@@ -81,35 +89,40 @@ class MultiWorld(MazeWorld):
         n_actions = len(self.actions)
         n_states = self.dims[0]*self.dims[1]
         # compute environment dynamics as a matrix T
-        T = np.zeros([n_states,n_actions,n_states])
+        T = np.zeros([n_states, len(self.agents), n_actions, n_states])
         # T[s',a,s] is the probability of landing in s' given action a is taken in state s.
         for s in range(n_states):
-            for agent in self.agents:
+            for k, agent in  enumerate(self.agents):
                 for i, a in enumerate(self.actions.keys()):
-                    s_new = self.act(s, a, agent.postion, agent.action)
-                    s_unc = list(map(lambda x : self.act(s, x, agent.postion, agent.action), filter(lambda x : x != a, self.actions.keys())))
-                    T[s_new, i, s] += det / len(self.agents)
+                    s_new = self.act(s, a, agent.position, agent.action)
+                    s_unc = list(map(lambda x : self.act(s, x, agent.position, agent.action), filter(lambda x : x != a, self.actions.keys())))
+                    T[s_new, k, i, s] += det
                     for su in s_unc:
-                        T[su, i, s] += ((1-det)/len(s_unc)) / len(self.agents)
+                        T[su, k, i, s] += ((1-det)/len(s_unc))
         self.T = T
         return T
 
 
     def influence_on_other(self, det=1.):
+        """ Computes probabilistic model T[s',a,s] corresponding to the maze world.
+        det : float between 0 and 1
+            Probability of action affecting other agent's state.
+        """
         n_actions = len(self.actions)
         n_states = self.dims[0]*self.dims[1]
         # compute environment dynamics as a matrix T
-        T = np.zeros([n_states, len(self.agents), n_actions,n_states])
+        T = np.zeros([n_states, len(self.agents), n_actions, n_states])
         # T[s',a,s] is the probability of landing in s' given action a is taken in state s.
+
         for s in range(n_states):
             for k, agent in enumerate(self.agents):
                 for i, a in enumerate(self.actions.keys()):
-                    for j, a_k in enumerate(self.actions.keys()):
-                            s_new = self.act(self._cell_to_index(agent.postion), a_k, self._index_to_cell(s), a)
-                            T[s_new, k, j, s] += det
-                            T[s_new, k, i, s] += det
-        self.T = T.sum(axis=1)
-        return T.sum(axis=1)
+                    s_k = self._cell_to_index(agent.position)
+                    s_new = self.act(s_k, agent.action, self._index_to_cell(s), a)
+                    T[s_new, k, i, s] += det  # probability of agent_k landing on s' by its action
+
+        self.T = T
+        return T
 
 
     def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None):
@@ -134,8 +147,9 @@ class MultiWorld(MazeWorld):
             y, x = zip(*wall)
             (y, x) = ([max(y), max(y)], [x[0], x[0] + 1]) if x[0] == x[1] else ([y[0], y[0] + 1], [max(x), max(x)])
             ax.plot(x, y, c = 'w')
+
         for agent in self.agents:
-            y, x = agent.postion
+            y, x = agent.position
             ax.add_patch(patches.Circle((x+.5, y+.5), .5, linewidth=1, edgecolor='k', facecolor='w'))
             dir = self.actions[agent.action]
             ax.arrow(x+.5, y+.5, dir[1]/2, dir[0]/2)

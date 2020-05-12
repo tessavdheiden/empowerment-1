@@ -44,14 +44,14 @@ def example_2():
 def example_3():
     """ Runs empowerment maximising agent running in a chosen grid world """
     # maze
-    n_step = 1
+    n_step = 3
     f = WorldFactory()
-    maze = f.door_world() # klyubin_world(), tunnel_world()
+    maze = f.door2_world() # klyubin_world(), tunnel_world()
     B = maze.compute_model()
     strategy = VisitCountFast()
     E = strategy.compute(world=maze, T=B, n_step=n_step).reshape(-1)
 
-    initpos = [4,4] # np.random.randint(maze.dims[0], size=2)
+    initpos = [0,0] # np.random.randint(maze.dims[0], size=2)
     s =  maze._cell_to_index(initpos)
 
     # for reference
@@ -86,12 +86,10 @@ def example_3():
     # some plotting
     fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(9, 3))
     Vmap = agent.value_map.reshape(*maze.dims)
-    maze.plot(fig, ax[0, 0], colorMap= Vmap, traj=traj)
+    maze.plot(fig, ax[0, 0], colorMap= Vmap)
     ax[0, 0].set_title('value map')
-    # Amap = agent.action_map
-    # U = np.array([(1 if a == 2 else (-1 if a == 3 else 0)) for a in Amap]).reshape(maze.height, maze.width)
-    # V = np.array([(1 if a == 0 else (-1 if a == 1 else 0)) for a in Amap]).reshape(maze.height, maze.width)
-    # plt.quiver(np.arange(maze.width) + .5, np.arange(maze.height) + .5, U, V)
+    Amap = np.array([list(maze.actions.values())[i] for i in agent.action_map])
+    ax[0, 0].quiver(np.arange(maze.width) + .5, np.arange(maze.height) + .5, Amap[:, 1].reshape(maze.height, maze.width), Amap[:, 0].reshape(maze.height, maze.width))
 
     maze.plot(fig, ax[0, 1], colorMap= agent.E.reshape(*maze.dims))
     ax[0, 1].set_title('subjective empowerment')
@@ -154,7 +152,7 @@ def example_5():
 def example_6():
     """ compute empowerment landscape for multiple agents"""
     fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(8, 8))
-    n_step = 3
+    n_step = 1
     strategy = VisitCount()
     f = WorldFactory()
 
@@ -199,38 +197,42 @@ def example_6():
 
 def example_7():
     fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 8))
-    n_step = 3
-    strategy = VisitCount()
+    n_step = 2
+    strategy = VisitCountFast()
     f = WorldFactory()
 
-    door = f.door2_world()
+    door = f.left_right_door_world()
     T = door.compute_model()
     E = strategy.compute(world=door, T=T, n_step=n_step)
     door.plot(fig, ax[0, 0], colorMap=E)
-    ax[0, 0].set_title(f'{n_step}-step door2')
-
+    ax[0, 0].set_title(f'{n_step}-step empowerment')
 
     f = MultiWorldFactory()
-    multiagent = f.door2_world_multi()
+    multiagent = f.door_world_left_right_stay()
     T = multiagent.compute_model()
     E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=n_step)
-    multiagent.plot(fig, ax[1, 0], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
-    ax[1, 0].set_title(f'{n_step}-step multiagent')
-    #
-    # E_ = strategy.compute(world=multiagent, T=T[:, 1], n_step=n_step)
-    # multiagent.plot(fig, ax[1, 1], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
-    # ax[1, 1].set_title(f'{n_step}-step multiagent')
+    multiagent.plot(fig, ax[0, 1], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
+    ax[0, 1].set_title(f'{n_step}-step transfer other-on-me')
 
-    # f = MultiWorldFactory()
-    # multiagent = f.klyubin_world_multi()
-    # T = multiagent.influence_on_other()
-    # E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=n_step)
-    # multiagent.plot(fig, ax[2, 0], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
-    # ax[2, 0].set_title(f'{n_step}-step multiagent')
-    #
-    # E_ = strategy.compute(world=multiagent, T=T[:, 1], n_step=n_step)
-    # multiagent.plot(fig, ax[2, 1], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
-    # ax[2, 1].set_title(f'{n_step}-step multiagent')
+    multiagent.print_state_numbers(fig, ax[1, 0])
+
+    T = multiagent.influence_on_other()
+    E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=1)
+    multiagent.plot(fig, ax[0, 2], colorMap=E_)
+    ax[0, 2].set_title(f'{n_step}-step transfer me-on-other')
+
+    multiagent = f.door_world_left_right_east()
+    T = multiagent.compute_model()
+    E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=n_step)
+    multiagent.plot(fig, ax[1, 1], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
+    ax[1, 1].set_title(f'{n_step}-step transfer other-on-me')
+
+    T = multiagent.influence_on_other()
+    E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=1)
+    multiagent.plot(fig, ax[1, 2], colorMap=E_)
+    ax[1, 2].set_title(f'{n_step}-step transfer me-on-other')
+
+
     plt.show()
 
 
@@ -243,4 +245,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_6()
+    example_7()

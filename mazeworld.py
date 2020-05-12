@@ -103,6 +103,14 @@ class MazeWorld(World):
         if action is not None:
             ax.set_title(str(action))
 
+    def print_state_numbers(self, fig, ax):
+        nums = np.array([[i * self.dims[1] + j for j in range(self.dims[1])] for i in range(self.dims[0])])
+        im = ax.pcolor(nums*0)
+        fig.colorbar(im, ax=ax)
+        for i in range(self.dims[0]):
+            for j in range(self.dims[1]):
+                ax.text(j + .5, i + .5, nums[i, j],ha="center", va="center", color="w")
+
 
 class WorldFactory(object):
     def create_maze_world(self, height, width):
@@ -181,4 +189,10 @@ class WorldFactory(object):
         for j in (centre + [-1,+1]):
             for d in ['N','S']:
                 maze.add_wall([centre[0],j], d)
+        return maze
+
+    def left_right_door_world(self):
+        maze = self.create_maze_world(height=6, width=7)
+        for i in range(maze.width):
+            if i not in [1, 5]: maze.add_wall([2, i], "N")
         return maze
