@@ -162,7 +162,7 @@ class WorldFactory(object):
         for i in range(maze.width):
             if i is not 6: maze.add_wall([2, i], "N")
         for i in range(maze.width):
-            if i is not 2: maze.add_wall([5, i], "N")
+            if i is not 2: maze.add_wall([4, i], "N")
         return maze
 
     def tunnel_world(self):

@@ -46,12 +46,12 @@ def example_3():
     # maze
     n_step = 3
     f = WorldFactory()
-    maze = f.door2_world() # klyubin_world(), tunnel_world()
+    maze = f.klyubin_world()#, tunnel_world()
     B = maze.compute_model()
     strategy = VisitCountFast()
     E = strategy.compute(world=maze, T=B, n_step=n_step).reshape(-1)
 
-    initpos = [0,0] # np.random.randint(maze.dims[0], size=2)
+    initpos = [1,3] # np.random.randint(maze.dims[0], size=2)
     s =  maze._cell_to_index(initpos)
 
     # for reference
@@ -61,27 +61,11 @@ def example_3():
 
     # agent
     agent = EmpMaxAgent(alpha=0.1, gamma=0.9, T=T, n_step=n_step, n_samples=1000, det=1.)
+    agent.s = s
 
     # training loop
     start = time.time()
-    steps = int(10000)
-    visited = np.zeros(maze.dims)
-    tau = np.zeros(steps)
-    D_emp = np.zeros(steps)
-    D_mod = n_s*n_a*np.ones(steps)
-    traj = []
-    for t in range(steps):
-        # append data for plotting
-        tau[t] = agent.tau
-        D_emp[t] = np.mean((E - agent.E)**2)
-        D_mod[t] = D_mod[t] - np.sum(np.argmax(agent.T, axis=0) == np.argmax(B, axis=0))
-        a = agent.act(s)
-        pos = maze._index_to_cell(s)
-        traj.append(pos)
-        visited[pos[0],pos[1]] += 1
-        s_ = maze.act(s,list(maze.actions.keys())[a])
-        agent.update(s,a,s_)
-        s = s_
+    D_emp, D_mod, steps, tau, traj, visited = train_agent(B, E, agent, maze, n_s, n_a)
     print("elapsed seconds: %0.3f" % (time.time() - start) )
     # some plotting
     fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(9, 3))
@@ -115,6 +99,30 @@ def example_3():
     ax[1, 2].plot(D_mod, color='tab:blue')
     ax[1, 2].tick_params(axis='y', labelcolor='tab:blue')
     plt.show()
+
+
+def train_agent(B, E, agent, maze, n_s, n_a):
+    steps = int(10000)
+    visited = np.zeros(maze.dims)
+    tau = np.zeros(steps)
+    D_emp = np.zeros(steps)
+    D_mod = n_s * n_a * np.ones(steps)
+    traj = []
+    for t in range(steps):
+        s = agent.s
+        # append data for plotting
+        tau[t] = agent.tau
+        D_emp[t] = np.mean((E - agent.E) ** 2)
+        D_mod[t] = D_mod[t] - np.sum(np.argmax(agent.T, axis=0) == np.argmax(B, axis=0))
+        a = agent.act(s)
+        pos = maze._index_to_cell(s)
+        traj.append(pos)
+        visited[pos[0], pos[1]] += 1
+        s_ = maze.act(s, list(maze.actions.keys())[a])
+        agent.update(s, a, s_)
+        agent.s = s_
+    return D_emp, D_mod, steps, tau, traj, visited
+
 
 def example_4():
     """ builds pendulum according to https://github.com/openai/gym/wiki/Pendulum-v0
@@ -194,48 +202,17 @@ def example_6():
 
     plt.show()
 
-
 def example_7():
     fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 8))
     n_step = 2
-    strategy = VisitCountFast()
-    f = WorldFactory()
 
-    door = f.left_right_door_world()
-    T = door.compute_model()
-    E = strategy.compute(world=door, T=T, n_step=n_step)
-    door.plot(fig, ax[0, 0], colorMap=E)
-    ax[0, 0].set_title(f'{n_step}-step empowerment')
+
 
     f = MultiWorldFactory()
-    multiagent = f.door_world_left_right_stay()
-    T = multiagent.compute_model()
-    E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=n_step)
-    multiagent.plot(fig, ax[0, 1], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
-    ax[0, 1].set_title(f'{n_step}-step transfer other-on-me')
-
-    multiagent.print_state_numbers(fig, ax[1, 0])
-
-    T = multiagent.influence_on_other()
-    E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=1)
-    multiagent.plot(fig, ax[0, 2], colorMap=E_)
-    ax[0, 2].set_title(f'{n_step}-step transfer me-on-other')
-
-    multiagent = f.door_world_left_right_east()
-    T = multiagent.compute_model()
-    E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=n_step)
-    multiagent.plot(fig, ax[1, 1], colorMap=E_, vmin=np.min(E), vmax=np.max(E))
-    ax[1, 1].set_title(f'{n_step}-step transfer other-on-me')
-
-    T = multiagent.influence_on_other()
-    E_ = strategy.compute(world=multiagent, T=T[:, 0], n_step=1)
-    multiagent.plot(fig, ax[1, 2], colorMap=E_)
-    ax[1, 2].set_title(f'{n_step}-step transfer me-on-other')
-
+    multiagent = f.klyubin_world_ma()
+    E_all = multiagent.influence_on_other(fig, ax)
 
     plt.show()
-
-
 
 
 if __name__ == "__main__":
