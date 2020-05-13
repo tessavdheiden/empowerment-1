@@ -13,6 +13,7 @@ class Agent(EmpMaxAgent):
         self.action = action
         self.visited = np.zeros(dims)
 
+
 from mazeworld import MazeWorld, WorldFactory
 
 
@@ -125,7 +126,7 @@ class MultiWorld(MazeWorld):
             s_ = self.act(s, action)
 
             influence = 0
-            for other in self.agents[:i] + self.agents[i+1:]:
+            for j, other in enumerate(self.agents[:i] + self.agents[i+1:]):
                 s_unc = set(map(lambda x : self.act(other.s, x), self.actions.keys())) # TODO: how many are already in collision of other agent
                 if self.in_collision(s_, action, other.s, other.action):
                     influence -= 1 / len(s_unc)
@@ -137,6 +138,19 @@ class MultiWorld(MazeWorld):
             agent.update(s, a, s_, influence)
             agent.s = s_
             agent.position = pos
+
+    def predict(self, action_map, s, n_step):
+        traj = np.zeros((n_step, 2))
+
+        state = self._index_to_cell(s)
+        for t in range(n_step):
+            traj[t, :] = state
+            a = action_map[s]
+            new_state = state + list(self.actions.values())[a]
+            state = state if np.any(new_state < np.zeros(2)) or np.any(new_state >= self.dims) else new_state
+            s = self._cell_to_index(state)
+
+        return traj
 
     def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None):
         ax.clear()

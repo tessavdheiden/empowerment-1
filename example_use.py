@@ -211,22 +211,28 @@ def example_7():
     steps = int(10000)
     for t in range(steps):
         multiagent.interact()
-    multiagent.plot(fig, ax[0, 0], colorMap=multiagent.agents[0].value_map.reshape(*multiagent.dims))
-    multiagent.plot(fig, ax[0, 1], colorMap=multiagent.agents[0].E.reshape(*multiagent.dims))
-    multiagent.plot(fig, ax[0, 2], colorMap=multiagent.agents[0].visited.reshape(*multiagent.dims))
 
-    multiagent.plot(fig, ax[1, 0], colorMap=multiagent.agents[1].value_map.reshape(*multiagent.dims))
-    multiagent.plot(fig, ax[1, 1], colorMap=multiagent.agents[1].E.reshape(*multiagent.dims))
-    multiagent.plot(fig, ax[1, 2], colorMap=multiagent.agents[1].visited.reshape(*multiagent.dims))
+        agent0 = multiagent.agents[0]
+        agent1 = multiagent.agents[1]
 
-    ax[0, 0].set_title(f'value map agent 0')
-    ax[0, 1].set_title(f'{multiagent.agents[0].n_step}-step empowerment agent 0')
-    ax[0, 2].set_title(f'visited agent 0')
+        traj = multiagent.predict(agent0.action_map, agent1.s, agent0.n_step)
+        multiagent.plot(fig, ax[0, 0], colorMap=agent0.value_map.reshape(*multiagent.dims), traj=traj)
+        multiagent.plot(fig, ax[0, 1], colorMap=agent0.E.reshape(*multiagent.dims))
+        multiagent.plot(fig, ax[0, 2], colorMap=agent0.visited.reshape(*multiagent.dims))
 
-    ax[1, 0].set_title(f'value map agent 1')
-    ax[1, 1].set_title(f'{multiagent.agents[1].n_step}-step empowerment agent 1')
-    ax[1, 2].set_title(f'visited agent 1')
-    #plt.pause(.0001)
+        traj = multiagent.predict(agent1.action_map, agent0.s, agent1.n_step)
+        multiagent.plot(fig, ax[1, 0], colorMap=agent1.value_map.reshape(*multiagent.dims), traj=traj)
+        multiagent.plot(fig, ax[1, 1], colorMap=agent1.E.reshape(*multiagent.dims))
+        multiagent.plot(fig, ax[1, 2], colorMap=agent1.visited.reshape(*multiagent.dims))
+
+        ax[0, 0].set_title(f'value map agent 0 and prediction agent 1')
+        ax[0, 1].set_title(f'{agent0.n_step}-step empowerment agent 0')
+        ax[0, 2].set_title(f'visited agent 0')
+
+        ax[1, 0].set_title(f'value map agent 1')
+        ax[1, 1].set_title(f'{agent1.n_step}-step empowerment agent 1')
+        ax[1, 2].set_title(f'visited agent 1')
+        plt.pause(.0001)
 
     plt.show()
 
