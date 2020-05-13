@@ -7,10 +7,11 @@ class Agent(EmpMaxAgent):
     def __init__(self, T, det):
         super().__init__(T, det, alpha=0.1, gamma=0.9, n_step=2, n_samples=1000)
 
-    def set(self, position, action, s):
+    def set(self, position, action, s, dims):
         self.s = s
         self.position = position
         self.action = action
+        self.visited = np.zeros(dims)
 
 from mazeworld import MazeWorld, WorldFactory
 
@@ -27,6 +28,8 @@ class MultiWorldFactory(WorldFactory):
 
     def klyubin_world_ma(self):
         maze = self.klyubin_world()
+        maze.add_wall([4, 4], 'E')
+        maze.add_wall([5, 4], 'E')
         maze.add_agent([1, 3], '_')
         maze.add_agent([4, 3], 'E')
         return maze
@@ -44,7 +47,7 @@ class MultiWorld(MazeWorld):
         position = np.array(position)
         emptymaze = MazeWorld(self.height, self.width)
         agent = Agent(T=emptymaze.compute_model(), det=1.)
-        agent.set(position, action, self._cell_to_index(position))
+        agent.set(position, action, self._cell_to_index(position), self.dims)
         self.agents.append(agent)
 
     def in_collision(self, s, a, s_, a_):
@@ -109,43 +112,31 @@ class MultiWorld(MazeWorld):
         self.T = T
         return T
 
-    def influence_on_other(self, fig, ax, det=1.):
+    def interact(self, det=1.):
         """ Computes probabilistic model T[s',a,s] corresponding to the maze world.
         det : float between 0 and 1
             Probability of action successfully performed (otherwise a random different action is performed with probability 1 - det). When det = 1 the dynamics are deterministic.
         """
+        for i, agent in enumerate(self.agents):
+            s = agent.s
+            a = agent.act(s)
+            action = list(self.actions.keys())[a]
+            agent.action = action
+            s_ = self.act(s, action)
 
-        steps = int(10000)
-        for t in range(steps):
-            # append data for plotting
-            for i, agent in enumerate(self.agents):
-                s = agent.s
-                a = agent.act(s)
-                agent.action = list(self.actions.keys())[a]
-                s_ = self.act(s, list(self.actions.keys())[a])
+            influence = 0
+            for other in self.agents[:i] + self.agents[i+1:]:
+                s_unc = set(map(lambda x : self.act(other.s, x), self.actions.keys())) # TODO: how many are already in collision of other agent
+                if self.in_collision(s_, action, other.s, other.action):
+                    influence -= 1 / len(s_unc)
+                    s_ = s
 
-                for other in self.agents[:i] + self.agents[i+1:]:
-                    if self.in_collision(s_, list(self.actions.keys())[a], self._cell_to_index(other.position), other.action):
-                        s_ = s
+            pos = self._index_to_cell(s_)
+            agent.visited[pos[0], pos[1]] += 1
 
-                agent.update(s, a, s_)
-                agent.s = s_
-                agent.position = self._index_to_cell(s_)
-
-            self.plot(fig, ax[0, 0], colorMap= self.agents[0].value_map.reshape(*self.dims))
-            self.plot(fig, ax[0, 1], colorMap=self.agents[0].E.reshape(*self.dims))
-
-            self.plot(fig, ax[1, 0], colorMap= self.agents[1].value_map.reshape(*self.dims))
-            self.plot(fig, ax[1, 1], colorMap=self.agents[1].E.reshape(*self.dims))
-            ax[0, 0].set_title(f'value map agent 0')
-            ax[0, 1].set_title(f'{self.agents[0].n_step}-step empowerment agent 0')
-            ax[1, 0].set_title(f'value map agent 1')
-            ax[1, 1].set_title(f'{self.agents[1].n_step}-step empowerment agent 1')
-            plt.pause(.0001)
-
-
-        E_all = [agent.E.reshape(*self.dims) for agent in self.agents]
-        return E_all
+            agent.update(s, a, s_, influence)
+            agent.s = s_
+            agent.position = pos
 
     def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None):
         ax.clear()

@@ -204,13 +204,29 @@ def example_6():
 
 def example_7():
     fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 8))
-    n_step = 2
-
-
+    np.random.seed(3)
 
     f = MultiWorldFactory()
     multiagent = f.klyubin_world_ma()
-    E_all = multiagent.influence_on_other(fig, ax)
+    steps = int(10000)
+    for t in range(steps):
+        multiagent.interact()
+    multiagent.plot(fig, ax[0, 0], colorMap=multiagent.agents[0].value_map.reshape(*multiagent.dims))
+    multiagent.plot(fig, ax[0, 1], colorMap=multiagent.agents[0].E.reshape(*multiagent.dims))
+    multiagent.plot(fig, ax[0, 2], colorMap=multiagent.agents[0].visited.reshape(*multiagent.dims))
+
+    multiagent.plot(fig, ax[1, 0], colorMap=multiagent.agents[1].value_map.reshape(*multiagent.dims))
+    multiagent.plot(fig, ax[1, 1], colorMap=multiagent.agents[1].E.reshape(*multiagent.dims))
+    multiagent.plot(fig, ax[1, 2], colorMap=multiagent.agents[1].visited.reshape(*multiagent.dims))
+
+    ax[0, 0].set_title(f'value map agent 0')
+    ax[0, 1].set_title(f'{multiagent.agents[0].n_step}-step empowerment agent 0')
+    ax[0, 2].set_title(f'visited agent 0')
+
+    ax[1, 0].set_title(f'value map agent 1')
+    ax[1, 1].set_title(f'{multiagent.agents[1].n_step}-step empowerment agent 1')
+    ax[1, 2].set_title(f'visited agent 1')
+    #plt.pause(.0001)
 
     plt.show()
 

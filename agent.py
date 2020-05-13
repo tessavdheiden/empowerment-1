@@ -66,7 +66,7 @@ class EmpMaxAgent:
         self.tau0 = 15  # initial tau
         self.tau = self.tau0
         self.t = 0
-        self.decay = 5e-4
+        self.decay = 5e-5
         self.s = None
 
     def act(self, s):
@@ -80,12 +80,12 @@ class EmpMaxAgent:
         self.t += 1
         return self.tau
 
-    def update(self, s, a, s_):
+    def update(self, s, a, s_, infl):
         # append experience, update model
         self.D[s_, a, s] += 1
         self.T[:, a, s] = normalize(self.D[:, a, s])
         # compute reward as empowerment achieved
-        r = self.estimateE(s_)
+        r = self.estimateE(s_) + infl
         self.E[s_] = r
         # update reward R
         self.R[s, a] = self.R[s, a] + self.alpha * (r - self.R[s, a])
