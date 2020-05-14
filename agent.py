@@ -66,7 +66,7 @@ class EmpMaxAgent:
         self.tau0 = 15  # initial tau
         self.tau = self.tau0
         self.t = 0
-        self.decay = 5e-5
+        self.decay = 5e-4
         self.s = None
 
     def act(self, s):

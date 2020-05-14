@@ -1,7 +1,12 @@
 import numpy as np
-import matplotlib.patches as patches
-from agent import EmpMaxAgent
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import math
+import itertools
+
+
+from agent import EmpMaxAgent
+
 
 class Agent(EmpMaxAgent):
     def __init__(self, T, det):
@@ -9,6 +14,7 @@ class Agent(EmpMaxAgent):
 
     def set(self, position, action, s, dims):
         self.s = s
+        self.s_ = s
         self.position = position
         self.action = action
         self.visited = np.zeros(dims)
@@ -25,6 +31,12 @@ class MultiWorldFactory(WorldFactory):
         maze = self.left_right_door_world()
         maze.add_agent([1, 3], '_')
         maze.add_agent([4, 3], 'E')
+        return maze
+
+    def simple(self):
+        maze = self.create_maze_world(3, 3)
+        maze.add_agent([1, 0], '_')
+        maze.add_agent([1, 2], 'E')
         return maze
 
     def klyubin_world_ma(self):
@@ -113,6 +125,73 @@ class MultiWorld(MazeWorld):
         self.T = T
         return T
 
+    def generate_configs(self, n_states, n_agents):
+        which = np.array(list(itertools.combinations(range(n_states), n_agents)))
+        grid = np.zeros((len(which), n_states), dtype="int8")
+        grid[np.arange(len(which))[None].T, which] = 1
+        return grid
+
+    def _omap_to_index(self, omap):
+        return np.where(np.all(self.configs == omap, axis=1))
+
+    def compute_ma_model(self, fig, ax, det=1.):
+        def nCr(n, r):
+            f = math.factorial
+            return int(f(n) / f(n - r) / f(r))
+
+        n_agents = len(self.agents)
+        n_states = self.dims[0]*self.dims[1]
+        n_configs = nCr(n_states, n_agents)
+        alists = [l for l in itertools.product(self.actions.keys(), repeat=n_agents)]
+        self.slists = list(itertools.combinations(np.arange(n_states), n_agents))
+        n_actions = len(alists)
+
+        self.configs = self.generate_configs(n_states, n_agents)
+        self.slists_new = np.zeros((n_configs, n_actions, n_agents))
+
+        # compute environment dynamics as a matrix T
+        T = np.zeros([n_configs, n_actions, n_configs])
+        # T[s',a,s] is the probability of landing in s' given action a is taken in state s.
+
+        for c in range(n_configs):
+            states = self.slists[c]
+            for i, alist in enumerate(alists):
+                for j, agent in enumerate(self.agents):
+                    agent.s = states[j]
+                    agent.position = self._index_to_cell(states[j])
+                    agent.action = alist[j]
+                # self.plot(fig, ax[0,0], colorMap=np.zeros(self.dims))
+                # ax[0,0].set_title(f"state={c}")
+
+                seen = set()
+                for agent in self.agents:
+                    s_ = self.act(agent.s, agent.action)
+                    seen.add(s_)
+
+                # any of the agents on same location, do not move
+                n_hot = np.zeros(n_states)
+                if len(seen) == n_agents:
+                    for agent in self.agents:
+                        agent.s = self.act(agent.s, agent.action)
+                        agent.position = self._index_to_cell(agent.s)
+
+                # self.plot(fig, ax[0, 1], colorMap=np.zeros(self.dims))
+                # ax[0, 1].set_title(f"in collision ={len(seen) != n_agents}")
+                # plt.pause(.001)
+
+                for j, agent in enumerate(self.agents):
+                    n_hot[agent.s] = 1
+                    self.slists_new[c][i][j] = agent.s
+
+                assert sum(n_hot) == n_agents
+
+                c_new = np.where(np.all(self.configs == n_hot, axis=1))
+                T[c_new, i, c] += det
+
+        self.T = T
+        return T
+
+
     def interact(self, det=1.):
         """ Computes probabilistic model T[s',a,s] corresponding to the maze world.
         det : float between 0 and 1
@@ -139,12 +218,13 @@ class MultiWorld(MazeWorld):
             agent.s = s_
             agent.position = pos
 
-    def predict(self, action_map, s, n_step):
-        traj = np.zeros((n_step, 2))
-
-        state = self._index_to_cell(s)
+    def predict(self, action_map, s, a, n_step):
+        traj = np.zeros((n_step+1, 2))
+        traj[0, :] = self._index_to_cell(s)
+        new_state = self._index_to_cell(s) + self.actions[a]
+        state = self._index_to_cell(s) if np.any(new_state < np.zeros(2)) or np.any(new_state >= self.dims) else new_state
         for t in range(n_step):
-            traj[t, :] = state
+            traj[t+1, :] = state
             a = action_map[s]
             new_state = state + list(self.actions.values())[a]
             state = state if np.any(new_state < np.zeros(2)) or np.any(new_state >= self.dims) else new_state
@@ -168,9 +248,7 @@ class MultiWorld(MazeWorld):
             y, x = zip(*traj)
             y = np.array(y) + 0.5
             x = np.array(x) + 0.5
-            ax.plot(x, y)
-            ax.scatter([x[0]], [y[0]], s = 100, c = 'b')
-            ax.scatter([x[-1]], [y[-1]], s = 100, c = 'r')
+            ax.plot(x, y, c = 'k')
         for wall in self.walls:
             y, x = zip(*wall)
             (y, x) = ([max(y), max(y)], [x[0], x[0] + 1]) if x[0] == x[1] else ([y[0], y[0] + 1], [max(x), max(x)])
@@ -185,5 +263,7 @@ class MultiWorld(MazeWorld):
 
         if action is not None:
             ax.set_title(str(action))
+
+
 
 

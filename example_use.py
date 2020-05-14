@@ -207,34 +207,62 @@ def example_7():
     np.random.seed(3)
 
     f = MultiWorldFactory()
-    multiagent = f.klyubin_world_ma()
+    w = f.klyubin_world_ma()
     steps = int(10000)
     for t in range(steps):
-        multiagent.interact()
+        w.interact()
 
-        agent0 = multiagent.agents[0]
-        agent1 = multiagent.agents[1]
+    a0 = w.agents[0]
+    a1 = w.agents[1]
 
-        traj = multiagent.predict(agent0.action_map, agent1.s, agent0.n_step)
-        multiagent.plot(fig, ax[0, 0], colorMap=agent0.value_map.reshape(*multiagent.dims), traj=traj)
-        multiagent.plot(fig, ax[0, 1], colorMap=agent0.E.reshape(*multiagent.dims))
-        multiagent.plot(fig, ax[0, 2], colorMap=agent0.visited.reshape(*multiagent.dims))
+    w.plot(fig, ax[0, 0], colorMap=a0.E.reshape(*w.dims))
+    ax[0, 0].set_title(f'{a0.n_step}-step empowerment agent 0')
 
-        traj = multiagent.predict(agent1.action_map, agent0.s, agent1.n_step)
-        multiagent.plot(fig, ax[1, 0], colorMap=agent1.value_map.reshape(*multiagent.dims), traj=traj)
-        multiagent.plot(fig, ax[1, 1], colorMap=agent1.E.reshape(*multiagent.dims))
-        multiagent.plot(fig, ax[1, 2], colorMap=agent1.visited.reshape(*multiagent.dims))
+    w.plot(fig, ax[0, 1], colorMap=a0.visited.reshape(*w.dims))
+    ax[0, 1].set_title(f'visited agent 0')
 
-        ax[0, 0].set_title(f'value map agent 0 and prediction agent 1')
-        ax[0, 1].set_title(f'{agent0.n_step}-step empowerment agent 0')
-        ax[0, 2].set_title(f'visited agent 0')
+    traj = w.predict(a0.action_map, a1.s, a1.action, a0.n_step)
+    w.plot(fig, ax[0, 2], colorMap=a0.value_map.reshape(*w.dims), traj=traj)
+    ax[0, 2].set_title(f'value map agent 0 and prediction agent 1')
 
-        ax[1, 0].set_title(f'value map agent 1')
-        ax[1, 1].set_title(f'{agent1.n_step}-step empowerment agent 1')
-        ax[1, 2].set_title(f'visited agent 1')
-        plt.pause(.0001)
+    w.plot(fig, ax[1, 0], colorMap=a1.E.reshape(*w.dims))
+    ax[1, 0].set_title(f'{a1.n_step}-step empowerment agent 1')
+
+    w.plot(fig, ax[1, 1], colorMap=a1.visited.reshape(*w.dims))
+    ax[1, 1].set_title(f'visited agent 1')
+
+    traj = w.predict(a1.action_map, a0.s, a0.action, a1.n_step)
+    w.plot(fig, ax[1, 2], colorMap=a1.value_map.reshape(*w.dims), traj=traj)
+    ax[1, 2].set_title(f'value map agent 1')
 
     plt.show()
+
+def example_8():
+    np.random.seed(3)
+    f = MultiWorldFactory()
+    w = f.simple()
+    fig, ax = plt.subplots(nrows=2, ncols=len(w.actions.keys())**len(w.agents) + 1, figsize=(25, 2))
+    T = w.compute_ma_model(fig, ax)
+    strategy = VisitCountFast()
+    E = strategy.compute(world=w, T=T, n_step=1)
+
+    idx = np.argsort(E)
+    for a, i in enumerate([idx[0], idx[-1]]):
+        for j, agent in enumerate(w.agents):
+            agent.s = w.slists[i][j]
+            agent.position = w._index_to_cell(agent.s)
+            agent.action = '_'
+
+        w.plot(fig, ax[a,0], colorMap=E[i]*np.ones(w.dims))
+
+        for idx, config in enumerate(w.slists_new[i]):
+            for j, t in enumerate(config):
+                w.agents[j].position = w._index_to_cell(t)
+
+            w.plot(fig, ax[a, idx+1], colorMap=np.zeros(w.dims))
+
+    plt.show()
+
 
 
 if __name__ == "__main__":
@@ -244,4 +272,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_7()
+    example_8()
