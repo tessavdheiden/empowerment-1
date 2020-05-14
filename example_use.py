@@ -160,7 +160,7 @@ def example_5():
 def example_6():
     """ compute empowerment landscape for multiple agents"""
     fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(8, 8))
-    n_step = 1
+    n_step = 3
     strategy = VisitCount()
     f = WorldFactory()
 
@@ -240,26 +240,28 @@ def example_7():
 def example_8():
     np.random.seed(3)
     f = MultiWorldFactory()
-    w = f.simple()
-    fig, ax = plt.subplots(nrows=2, ncols=len(w.actions.keys())**len(w.agents) + 1, figsize=(25, 2))
+    w = f.step_ma()
+    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(4, 4))
     T = w.compute_ma_model(fig, ax)
     strategy = VisitCountFast()
     E = strategy.compute(world=w, T=T, n_step=1)
 
     idx = np.argsort(E)
-    for a, i in enumerate([idx[0], idx[-1]]):
-        for j, agent in enumerate(w.agents):
-            agent.s = w.slists[i][j]
-            agent.position = w._index_to_cell(agent.s)
-            agent.action = '_'
 
-        w.plot(fig, ax[a,0], colorMap=E[i]*np.ones(w.dims))
+    for j, agent in enumerate(w.agents):
+        agent.s = w.slists[idx[0]][j]
+        agent.position = w._index_to_cell(agent.s)
+        agent.action = '_'
 
-        for idx, config in enumerate(w.slists_new[i]):
-            for j, t in enumerate(config):
-                w.agents[j].position = w._index_to_cell(t)
+    w.plot(fig, ax[0, 0], colorMap=np.zeros(w.dims))
+    ax[0,0].set_title("low empowerment")
 
-            w.plot(fig, ax[a, idx+1], colorMap=np.zeros(w.dims))
+    for j, agent in enumerate(w.agents):
+        agent.s = w.slists[idx[-1]][j]
+        agent.position = w._index_to_cell(agent.s)
+        agent.action = '_'
+    w.plot(fig, ax[0, 1], colorMap=np.ones(w.dims))
+    ax[0, 1].set_title("high empowerment")
 
     plt.show()
 

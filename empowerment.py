@@ -96,7 +96,7 @@ class VisitCountFast(EmpowermentStrategy):
             Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))
         # fold over each nstep actions, get unique end states
         seen = map(lambda x: np.unique(x), np.argmax(Bn[:, :, :], axis=0).T)
-        return np.fromiter(map(lambda x: np.log2(len(x)), seen), dtype=np.float).reshape(world.dims)
+        return np.fromiter(map(lambda x: np.log2(len(x)), seen), dtype=np.float)#.reshape(world.dims)
 
 
 

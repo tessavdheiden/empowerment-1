@@ -37,6 +37,7 @@ class MultiWorldFactory(WorldFactory):
         maze = self.create_maze_world(3, 3)
         maze.add_agent([1, 0], '_')
         maze.add_agent([1, 2], 'E')
+        maze.add_agent([1, 1], 'E')
         return maze
 
     def klyubin_world_ma(self):
@@ -46,6 +47,21 @@ class MultiWorldFactory(WorldFactory):
         maze.add_agent([1, 3], '_')
         maze.add_agent([4, 3], 'E')
         return maze
+
+    def door_ma(self):
+        maze = self.door_world()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        maze.add_agent([5, 3], 'E')
+        return maze
+
+    def step_ma(self):
+        maze = self.step_world()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        maze.add_agent([4, 1], 'E')
+        return maze
+
 
 class MultiWorld(MazeWorld):
     """ Represents an n x m grid world with walls at various locations and other agents.
@@ -232,14 +248,14 @@ class MultiWorld(MazeWorld):
 
         return traj
 
-    def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None):
+    def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None,cmap='viridis'):
         ax.clear()
         G = np.zeros(self.dims) if colorMap is None else colorMap.copy()
         # plot color map
         if vmax is not None:
-            im = ax.pcolor(G, vmin=vmin, vmax=vmax)#, cmap = 'Greys')
+            im = ax.pcolor(G, vmin=vmin, vmax=vmax, cmap=cmap)
         else:
-            im = ax.pcolor(G)
+            im = ax.pcolor(G, cmap=cmap)
         #fig.colorbar(im, ax=ax)
         if pos is not None:
             ax.scatter([pos[1] + 0.5], [pos[0] + 0.5], s = 100, c = 'w')
