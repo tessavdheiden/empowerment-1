@@ -16,7 +16,7 @@ class World(object):
     def _cell_to_index(self, cell):
         return cell[1] + self.dims[1]*cell[0]
 
-    def compute_model(self, det = 1.):
+    def compute_transition(self, det = 1.):
         """ Computes probabilistic model T[s',a,s] corresponding to the maze world.
         det : float between 0 and 1
             Probability of action successfully performed (otherwise a random different action is performed with probability 1 - det). When det = 1 the dynamics are deterministic.

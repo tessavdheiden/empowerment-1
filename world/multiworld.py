@@ -6,6 +6,7 @@ import itertools
 
 
 from agent import EmpMaxAgent
+from world.mazeworld import MazeWorld, WorldFactory
 
 
 class Agent(EmpMaxAgent):
@@ -20,55 +21,6 @@ class Agent(EmpMaxAgent):
         self.visited = np.zeros(dims)
 
 
-from world.mazeworld import MazeWorld, WorldFactory
-
-
-class MultiWorldFactory(WorldFactory):
-    def create_maze_world(self, height, width):
-        return MultiWorld(height, width)
-
-    def klyubin_2agents(self):
-        maze = self.klyubin_world()
-        maze.add_wall([4, 4], 'E')
-        maze.add_wall([5, 4], 'E')
-        maze.add_agent([1, 3], '_')
-        maze.add_agent([4, 3], 'E')
-        return maze
-
-    def door_3agents(self):
-        maze = self.door_world()
-        maze.add_agent([1, 3], '_')
-        maze.add_agent([4, 3], 'E')
-        maze.add_agent([5, 3], 'E')
-        return maze
-
-    def door2_2agents(self):
-        maze = self.door2_world()
-        maze.add_agent([1, 3], '_')
-        maze.add_agent([4, 3], 'E')
-        return maze
-
-    def tunnel_2agents(self):
-        maze = self.tunnel_world()
-        maze.add_agent([1, 3], '_')
-        maze.add_agent([4, 3], 'E')
-        return maze
-
-    def step_3agents(self):
-        maze = self.step_world()
-        maze.add_agent([1, 3], '_')
-        maze.add_agent([4, 3], 'E')
-        maze.add_agent([4, 1], 'E')
-        return maze
-
-    def simple_2agents(self):
-        maze = self.simple()
-        maze.add_agent([1, 3], '_')
-        maze.add_agent([4, 3], 'E')
-        return maze
-
-
-
 class MultiWorld(MazeWorld):
     """ Represents an n x m grid world with walls at various locations and other agents.
         This agent controls the actions/states of other agents.
@@ -77,13 +29,18 @@ class MultiWorld(MazeWorld):
     def __init__(self, height, width, toroidal = False):
         super().__init__(height, width, toroidal)
         self.agents = []
+        self.locations = list()
+        self.grids = list()
+        self.n_s = height*width
+        self.n_a = 0
 
     def add_agent(self, position, action):
         position = np.array(position)
         emptymaze = MazeWorld(self.height, self.width)
-        agent = Agent(T=emptymaze.compute_model(), det=1.)
+        agent = Agent(T=emptymaze.compute_transition(), det=1.)
         agent.set(position, action, self._cell_to_index(position), self.dims)
         self.agents.append(agent)
+        self.n_a = len(self.agents)
 
     def in_collision(self, s, a, s_, a_):
         """ are or will be on same location or move through each other
@@ -127,63 +84,29 @@ class MultiWorld(MazeWorld):
 
         return self._cell_to_index(new_state)
 
-    def compute_model(self, det=1.):
-        """ Computes probabilistic model T[s',a,s] corresponding to the maze world.
-        det : float between 0 and 1
-            Probability of action successfully performed (otherwise a random different action is performed with probability 1 - det). When det = 1 the dynamics are deterministic.
-        """
-        n_actions = len(self.actions)
-        n_states = self.dims[0]*self.dims[1]
-        # compute environment dynamics as a matrix T
-        T = np.zeros([n_states, n_actions, n_states])
-        # T[s',a,s] is the probability of landing in s' given action a is taken in state s.
-        for s in range(n_states):
-            for i, a in enumerate(self.actions.keys()):
-                s_new = self.act(s, a)
-                s_unc = list(map(lambda x : self.act(s, x), filter(lambda x : x != a, self.actions.keys())))
-                T[s_new, i, s] += det
-                for su in s_unc:
-                    T[su, i, s] += ((1-det)/len(s_unc))
-        self.T = T
-        return T
-
     def generate_configs(self, n_states, n_agents):
-        which = np.array(list(itertools.combinations(range(n_states), n_agents)))
+        which = np.array(list(itertools.combinations(range(n_states), n_agents)), dtype="int8")
         grid = np.zeros((len(which), n_states), dtype="int8")
         grid[np.arange(len(which))[None].T, which] = 1
         return grid
 
-    def _omap_to_index(self, omap):
-        return np.where(np.all(self.configs == omap, axis=1))
-
-    def compute_ma_model(self, det=1.):
-        def nCr(n, r):
-            f = math.factorial
-            return int(f(n) / f(n - r) / f(r))
-
-        n_agents = len(self.agents)
-        n_states = self.dims[0]*self.dims[1]
-        n_configs = nCr(n_states, n_agents)
-        alists = [l for l in itertools.product(self.actions.keys(), repeat=n_agents)]
-        self.slists = list(itertools.combinations(np.arange(n_states), n_agents))
+    def compute_ma_transition(self, det=1.):
+        alists = [al for al in itertools.product(self.actions.keys(), repeat=self.n_a)]
         n_actions = len(alists)
 
-        self.configs = self.generate_configs(n_states, n_agents)
-        self.slists_new = np.zeros((n_configs, n_actions, n_agents))
+        self.locations = list(itertools.combinations(np.arange(self.n_s), self.n_a))
+        self.grids = self.generate_configs(self.n_s, self.n_a)
 
+        n_configs = len(self.grids)
         # compute environment dynamics as a matrix T
         T = np.zeros([n_configs, n_actions, n_configs])
         # T[s',a,s] is the probability of landing in s' given action a is taken in state s.
 
         for c in range(n_configs):
-            states = self.slists[c]
             for i, alist in enumerate(alists):
                 for j, agent in enumerate(self.agents):
-                    agent.s = states[j]
-                    #agent.position = self._index_to_cell(states[j])
+                    agent.s = self._index_to_location(c, j)
                     agent.action = alist[j]
-                # self.plot(fig, ax[0,0], colorMap=np.zeros(self.dims))
-                # ax[0,0].set_title(f"state={c}")
 
                 seen = set()
                 for agent in self.agents:
@@ -191,28 +114,29 @@ class MultiWorld(MazeWorld):
                     seen.add(s_)
 
                 # any of the agents on same location, do not move
-                n_hot = np.zeros(n_states)
-                if len(seen) == n_agents:
+                if len(seen) == self.n_a:
                     for agent in self.agents:
                         agent.s = self.act(agent.s, agent.action)
-                        #agent.position = self._index_to_cell(agent.s)
 
-                # self.plot(fig, ax[0, 1], colorMap=np.zeros(self.dims))
-                # ax[0, 1].set_title(f"in collision ={len(seen) != n_agents}")
-                # plt.pause(.001)
-
-                for j, agent in enumerate(self.agents):
-                    n_hot[agent.s] = 1
-                    self.slists_new[c][i][j] = agent.s
-
-                assert sum(n_hot) == n_agents
-
-                c_new = np.where(np.all(self.configs == n_hot, axis=1))
+                locs = [agent.s for agent in self.agents]
+                grid = self._location_to_grid(locs)
+                c_new = self._grid_to_index(grid)
                 T[c_new, i, c] += det
 
         self.T = T
         return T
 
+    def _index_to_location(self, c, j):
+        return self.locations[c][j]
+
+    def _location_to_grid(self, locs):
+        grid = np.zeros(self.n_s)
+        for l in locs:
+            grid[l] = 1
+        return grid
+
+    def _grid_to_index(self, grid):
+        return np.where(np.all(self.grids == grid, axis=1))
 
     def interact(self, det=1.):
         """ Computes probabilistic model T[s',a,s] corresponding to the maze world.
@@ -288,5 +212,49 @@ class MultiWorld(MazeWorld):
             ax.set_title(str(action))
 
 
+
+class MultiWorldFactory(WorldFactory):
+    def create_maze_world(self, height, width):
+        return MultiWorld(height, width)
+
+    def klyubin_2agents(self):
+        maze = self.klyubin_world()
+        maze.add_wall([4, 4], 'E')
+        maze.add_wall([5, 4], 'E')
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        return maze
+
+    def door_3agents(self):
+        maze = self.door_world()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        maze.add_agent([5, 3], 'E')
+        return maze
+
+    def door2_2agents(self):
+        maze = self.door2_world()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        return maze
+
+    def tunnel_2agents(self):
+        maze = self.tunnel_world()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        return maze
+
+    def step_3agents(self):
+        maze = self.step_world()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        maze.add_agent([4, 1], 'E')
+        return maze
+
+    def simple_2agents(self):
+        maze = self.simple()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        return maze
 
 

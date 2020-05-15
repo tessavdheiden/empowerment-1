@@ -16,7 +16,7 @@ def example_1():
     f = WorldFactory()
     maze = f.klyubin_world()
     # compute the 5-step empowerment at each cell
-    T = maze.compute_model()
+    T = maze.compute_transition()
     start = time.time()
     E = strategy.compute(world=maze, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
@@ -32,7 +32,7 @@ def example_2():
     strategy = VisitCount()
     maze = f.door2_world()
     n_step = 4
-    T = maze.compute_model()
+    T = maze.compute_transition()
     start = time.time()
     E = strategy.compute(world=maze, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
@@ -48,7 +48,7 @@ def example_3():
     n_step = 3
     f = WorldFactory()
     maze = f.klyubin_world()#, tunnel_world()
-    B = maze.compute_model()
+    B = maze.compute_transition()
     strategy = VisitCountFast()
     E = strategy.compute(world=maze, T=B, n_step=n_step).reshape(-1)
 
@@ -57,7 +57,7 @@ def example_3():
 
     # for reference
     emptymaze = MazeWorld(maze.height, maze.width)
-    T = emptymaze.compute_model()
+    T = emptymaze.compute_transition()
     n_s, n_a, _ = T.shape
 
     # agent
@@ -131,7 +131,7 @@ def example_4():
     pendulum = Pendulum(9,15)
     strategy = VisitCountFast()
     start = time.time()
-    T = pendulum.compute_model()
+    T = pendulum.compute_transition()
     n_step = 5
     E = strategy.compute(world=pendulum, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
@@ -146,7 +146,7 @@ def example_5():
     maze = MazeWorld(5, 5)
     n_step = 3
     start = time.time()
-    T = maze.compute_model()
+    T = maze.compute_transition()
     strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
     strategy = BlahutArimoto()
     #strategy.train_batch(world=maze, T=T, n_step=n_step)
@@ -166,37 +166,37 @@ def example_6():
     f = WorldFactory()
 
     w = f.klyubin_world()
-    T = w.compute_model()
+    T = w.compute_transition()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[0, 0], colorMap=E.reshape(w.dims))
     ax[0, 0].set_title(f'{n_step}-step klyubin')
 
     w = f.door_world()
-    T = w.compute_model()
+    T = w.compute_transition()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 0], colorMap=E.reshape(w.dims))
     ax[1, 0].set_title(f'{n_step}-step door')
 
     w = f.door2_world()
-    T = w.compute_model()
+    T = w.compute_transition()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[2, 0], colorMap=E.reshape(w.dims))
     ax[2, 0].set_title(f'{n_step}-step door2')
 
     w = f.step_world()
-    T = w.compute_model()
+    T = w.compute_transition()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[0, 1], colorMap=E.reshape(w.dims))
     ax[0, 1].set_title(f'{n_step}-step step')
 
     w = f.tunnel_world()
-    T = w.compute_model()
+    T = w.compute_transition()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 1], colorMap=E.reshape(w.dims))
     ax[1, 1].set_title(f'{n_step}-step tunnel')
 
     w = Pendulum(9, 15)
-    T = w.compute_model()
+    T = w.compute_transition()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[2, 1], colorMap=E.reshape(w.dims))
     ax[2, 1].set_title(f'{n_step}-step pendulum')
@@ -251,46 +251,45 @@ def example_8():
 
     w = f.klyubin_2agents()
     start = time.time()
-    T = w.compute_ma_model()
+    T = w.compute_ma_transition()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     idx = np.argsort(E)
     for j, agent in enumerate(w.agents):
-        agent.s = w.slists[idx[0]][j]
+        agent.s = w._index_to_location(idx[0], j)
         agent.action = '_'
 
     w.plot(fig, ax[0, 0], colorMap=np.zeros(w.dims))
     ax[0, 0].set_title(f'{n_step}-step klyubin low')
 
     for j, agent in enumerate(w.agents):
-        agent.s = w.slists[idx[-1]][j]
+        agent.s = w._index_to_location(idx[-1], j)
         agent.action = '_'
 
     w.plot(fig, ax[0, 1], colorMap=np.zeros(w.dims))
     ax[0, 1].set_title(f'{n_step}-step klyubin high')
 
-    w = f.door_3agents()
+    w = f.step_3agents()
     start = time.time()
-    T = w.compute_ma_model()
+    T = w.compute_ma_transition()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     idx = np.argsort(E)
     for j, agent in enumerate(w.agents):
-        agent.s = w.slists[idx[0]][j]
+        agent.s = w._index_to_location(idx[0], j)
         agent.action = '_'
 
     w.plot(fig, ax[0, 2], colorMap=np.zeros(w.dims))
     ax[0, 2].set_title(f'{n_step}-step door low')
 
     for j, agent in enumerate(w.agents):
-        agent.s = w.slists[idx[-1]][j]
+        agent.s = w._index_to_location(idx[-1], j)
         agent.action = '_'
 
     w.plot(fig, ax[0, 3], colorMap=np.zeros(w.dims))
     ax[0, 3].set_title(f'{n_step}-step door high')
 
     plt.show()
-
 
 
 if __name__ == "__main__":
@@ -300,4 +299,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_7()
+    example_8()
