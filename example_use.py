@@ -22,13 +22,14 @@ def example_1():
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
     # plot the maze world
-    maze.plot(fig, ax, colorMap=E)
+    maze.plot(fig, ax, colorMap=E.reshape(maze.dims))
     plt.title(f'{n_step}-step empowerment')
     plt.show()
 
 def example_2():
     """ builds grid world with doors and plots empowerment landscape """
     f = WorldFactory()
+    strategy = VisitCount()
     maze = f.door2_world()
     n_step = 4
     T = maze.compute_model()
@@ -37,7 +38,7 @@ def example_2():
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     # plot the maze world
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
-    maze.plot(fig, ax, colorMap=E)
+    maze.plot(fig, ax, colorMap=E.reshape(maze.dims))
     plt.title(f'{n_step}-step empowerment')
     plt.show()
 
@@ -136,7 +137,7 @@ def example_4():
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     # plot the landscape
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(3, 3))
-    pendulum.plot(fig, ax, colorMap=E)
+    pendulum.plot(fig, ax, colorMap=E.reshape(pendulum.dims))
     plt.title(f'{n_step}-step empowerment')
     plt.show()
 
@@ -152,62 +153,63 @@ def example_5():
     E = strategy.compute(world=maze, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7, 5))
-    maze.plot(fig, ax, colorMap=E)
+    maze.plot(fig, ax, colorMap=E.reshape(maze.dims))
     ax.set_title('%i-step empowerment' % n_step)
     plt.show()
     #plt.savefig("results/finalE.png")
 
 def example_6():
-    """ compute empowerment landscape for multiple agents"""
+    """ compute empowerment landscape for scenerios"""
     fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(8, 8))
     n_step = 3
     strategy = VisitCount()
     f = WorldFactory()
 
-    klyubin = f.klyubin_world()
-    T = klyubin.compute_model()
-    E = strategy.compute(world=klyubin, T=T, n_step=n_step)
-    klyubin.plot(fig, ax[0, 0], colorMap=E)
+    w = f.klyubin_world()
+    T = w.compute_model()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[0, 0], colorMap=E.reshape(w.dims))
     ax[0, 0].set_title(f'{n_step}-step klyubin')
 
-    door = f.door_world()
-    T = door.compute_model()
-    E = strategy.compute(world=door, T=T, n_step=n_step)
-    door.plot(fig, ax[1, 0], colorMap=E)
+    w = f.door_world()
+    T = w.compute_model()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[1, 0], colorMap=E.reshape(w.dims))
     ax[1, 0].set_title(f'{n_step}-step door')
 
-    door = f.door2_world()
-    T = door.compute_model()
-    E = strategy.compute(world=door, T=T, n_step=n_step)
-    door.plot(fig, ax[2, 0], colorMap=E)
+    w = f.door2_world()
+    T = w.compute_model()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[2, 0], colorMap=E.reshape(w.dims))
     ax[2, 0].set_title(f'{n_step}-step door2')
 
-    step = f.step_world()
-    T = step.compute_model()
-    E = strategy.compute(world=step, T=T, n_step=n_step)
-    step.plot(fig, ax[0, 1], colorMap=E)
+    w = f.step_world()
+    T = w.compute_model()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[0, 1], colorMap=E.reshape(w.dims))
     ax[0, 1].set_title(f'{n_step}-step step')
 
-    tunnel = f.tunnel_world()
-    T = tunnel.compute_model()
-    E = strategy.compute(world=tunnel, T=T, n_step=n_step)
-    tunnel.plot(fig, ax[1, 1], colorMap=E)
+    w = f.tunnel_world()
+    T = w.compute_model()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[1, 1], colorMap=E.reshape(w.dims))
     ax[1, 1].set_title(f'{n_step}-step tunnel')
 
-    pendulum = Pendulum(9, 15)
-    T = pendulum.compute_model()
-    E = strategy.compute(world=pendulum, T=T, n_step=n_step)
-    pendulum.plot(fig, ax[2, 1], colorMap=E)
+    w = Pendulum(9, 15)
+    T = w.compute_model()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[2, 1], colorMap=E.reshape(w.dims))
     ax[2, 1].set_title(f'{n_step}-step pendulum')
 
     plt.show()
 
 def example_7():
+    """ compute empowerment landscape and value map for single agents in multi-agent scenario"""
     fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 8))
     np.random.seed(3)
 
     f = MultiWorldFactory()
-    w = f.klyubin_world_ma()
+    w = f.klyubin_2agents()
     steps = int(10000)
     for t in range(steps):
         w.interact()
@@ -238,6 +240,7 @@ def example_7():
     plt.show()
 
 def example_8():
+    """ compute combined empowerment landscapes for all agents in multi-agent scenario"""
     np.random.seed(3)
 
     fig, ax = plt.subplots(nrows=3, ncols=4, figsize=(8, 8))
@@ -245,7 +248,8 @@ def example_8():
     strategy = VisitCountFast()
 
     f = MultiWorldFactory()
-    w = f.tunnel_2agents()
+
+    w = f.klyubin_2agents()
     start = time.time()
     T = w.compute_ma_model()
     E = strategy.compute(world=w, T=T, n_step=n_step)
@@ -265,6 +269,26 @@ def example_8():
     w.plot(fig, ax[0, 1], colorMap=np.zeros(w.dims))
     ax[0, 1].set_title(f'{n_step}-step klyubin high')
 
+    w = f.door_3agents()
+    start = time.time()
+    T = w.compute_ma_model()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
+    idx = np.argsort(E)
+    for j, agent in enumerate(w.agents):
+        agent.s = w.slists[idx[0]][j]
+        agent.action = '_'
+
+    w.plot(fig, ax[0, 2], colorMap=np.zeros(w.dims))
+    ax[0, 2].set_title(f'{n_step}-step door low')
+
+    for j, agent in enumerate(w.agents):
+        agent.s = w.slists[idx[-1]][j]
+        agent.action = '_'
+
+    w.plot(fig, ax[0, 3], colorMap=np.zeros(w.dims))
+    ax[0, 3].set_title(f'{n_step}-step door high')
+
     plt.show()
 
 
@@ -276,4 +300,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_8()
+    example_7()

@@ -180,7 +180,7 @@ class WorldFactory(object):
         return maze
 
     def step_world(self):
-        n = 5
+        n = 7
         maze = self.create_maze_world(n,n)
         centre = np.array([(n-1)/2]*2, dtype = int)
         for i in (centre + [-1,+1]):
