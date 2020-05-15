@@ -42,6 +42,13 @@ class MultiWorld(MazeWorld):
         self.agents.append(agent)
         self.n_a = len(self.agents)
 
+    def add_social_agent(self, position, action):
+        self.n_a = 2
+        position = np.array(position)
+        agent = Agent(T=self.compute_ma_transition(), det=1.)
+        agent.set(position, action, self._cell_to_index(position), self.dims)
+        self.agents.append(agent)
+
     def in_collision(self, s, a, s_, a_):
         """ are or will be on same location or move through each other
         behind wall or off-grid will prevent a collision
@@ -225,11 +232,10 @@ class MultiWorldFactory(WorldFactory):
         maze.add_agent([4, 3], 'E')
         return maze
 
-    def door_3agents(self):
+    def door_2agents(self):
         maze = self.door_world()
         maze.add_agent([1, 3], '_')
         maze.add_agent([4, 3], 'E')
-        maze.add_agent([5, 3], 'E')
         return maze
 
     def door2_2agents(self):

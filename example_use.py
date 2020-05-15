@@ -269,25 +269,25 @@ def example_8():
     w.plot(fig, ax[0, 1], colorMap=np.zeros(w.dims))
     ax[0, 1].set_title(f'{n_step}-step klyubin high')
 
-    w = f.step_3agents()
-    start = time.time()
-    T = w.compute_ma_transition()
-    E = strategy.compute(world=w, T=T, n_step=n_step)
-    print(f"elapsed seconds: {time.time() - start:0.3f}")
-    idx = np.argsort(E)
-    for j, agent in enumerate(w.agents):
-        agent.s = w._index_to_location(idx[0], j)
-        agent.action = '_'
-
-    w.plot(fig, ax[0, 2], colorMap=np.zeros(w.dims))
-    ax[0, 2].set_title(f'{n_step}-step door low')
-
-    for j, agent in enumerate(w.agents):
-        agent.s = w._index_to_location(idx[-1], j)
-        agent.action = '_'
-
-    w.plot(fig, ax[0, 3], colorMap=np.zeros(w.dims))
-    ax[0, 3].set_title(f'{n_step}-step door high')
+    # w = f.door_3agents()
+    # start = time.time()
+    # T = w.compute_ma_transition()
+    # E = strategy.compute(world=w, T=T, n_step=n_step)
+    # print(f"elapsed seconds: {time.time() - start:0.3f}")
+    # idx = np.argsort(E)
+    # for j, agent in enumerate(w.agents):
+    #     agent.s = w._index_to_location(idx[0], j)
+    #     agent.action = '_'
+    #
+    # w.plot(fig, ax[0, 2], colorMap=np.zeros(w.dims))
+    # ax[0, 2].set_title(f'{n_step}-step door low')
+    #
+    # for j, agent in enumerate(w.agents):
+    #     agent.s = w._index_to_location(idx[-1], j)
+    #     agent.action = '_'
+    #
+    # w.plot(fig, ax[0, 3], colorMap=np.zeros(w.dims))
+    # ax[0, 3].set_title(f'{n_step}-step door high')
 
     plt.show()
 
