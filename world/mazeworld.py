@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from world import World
+from world.world import World
 
 class MazeWorld(World):
     """ Represents an n x m grid world with walls at various locations. Actions can be performed (N, S, E, W, "stay") moving a player around the grid world. You can't move through walls. """
@@ -196,3 +196,7 @@ class WorldFactory(object):
         for i in range(maze.width):
             if i not in [1, 5]: maze.add_wall([2, i], "N")
         return maze
+
+    def simple(self):
+        return self.create_maze_world(height=3, width=3)
+

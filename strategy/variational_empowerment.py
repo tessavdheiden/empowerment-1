@@ -2,12 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.distributions import Normal
 import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-from empowerment_strategy import EmpowermentStrategy
+from strategy.empowerment_strategy import EmpowermentStrategy
 
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")

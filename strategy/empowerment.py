@@ -6,7 +6,7 @@ describing the probabilistic dynamics of an environment.
 import numpy as np 
 from functools import reduce
 import itertools
-from empowerment_strategy import EmpowermentStrategy
+from strategy.empowerment_strategy import EmpowermentStrategy
 from info_theory import blahut_arimoto, _rand_dist, blahut_arimoto_batched
 
 

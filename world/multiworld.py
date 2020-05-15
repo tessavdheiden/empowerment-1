@@ -20,27 +20,14 @@ class Agent(EmpMaxAgent):
         self.visited = np.zeros(dims)
 
 
-from mazeworld import MazeWorld, WorldFactory
+from world.mazeworld import MazeWorld, WorldFactory
 
 
 class MultiWorldFactory(WorldFactory):
     def create_maze_world(self, height, width):
         return MultiWorld(height, width)
 
-    def door_world_left_right_ma(self):
-        maze = self.left_right_door_world()
-        maze.add_agent([1, 3], '_')
-        maze.add_agent([4, 3], 'E')
-        return maze
-
-    def simple(self):
-        maze = self.create_maze_world(3, 3)
-        maze.add_agent([1, 0], '_')
-        maze.add_agent([1, 2], 'E')
-        maze.add_agent([1, 1], 'E')
-        return maze
-
-    def klyubin_world_ma(self):
+    def klyubin_2agents(self):
         maze = self.klyubin_world()
         maze.add_wall([4, 4], 'E')
         maze.add_wall([5, 4], 'E')
@@ -48,19 +35,38 @@ class MultiWorldFactory(WorldFactory):
         maze.add_agent([4, 3], 'E')
         return maze
 
-    def door_ma(self):
+    def door_3agents(self):
         maze = self.door_world()
         maze.add_agent([1, 3], '_')
         maze.add_agent([4, 3], 'E')
         maze.add_agent([5, 3], 'E')
         return maze
 
-    def step_ma(self):
+    def door2_2agents(self):
+        maze = self.door2_world()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        return maze
+
+    def tunnel_2agents(self):
+        maze = self.tunnel_world()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        return maze
+
+    def step_3agents(self):
         maze = self.step_world()
         maze.add_agent([1, 3], '_')
         maze.add_agent([4, 3], 'E')
         maze.add_agent([4, 1], 'E')
         return maze
+
+    def simple_2agents(self):
+        maze = self.simple()
+        maze.add_agent([1, 3], '_')
+        maze.add_agent([4, 3], 'E')
+        return maze
+
 
 
 class MultiWorld(MazeWorld):
@@ -150,7 +156,7 @@ class MultiWorld(MazeWorld):
     def _omap_to_index(self, omap):
         return np.where(np.all(self.configs == omap, axis=1))
 
-    def compute_ma_model(self, fig, ax, det=1.):
+    def compute_ma_model(self, det=1.):
         def nCr(n, r):
             f = math.factorial
             return int(f(n) / f(n - r) / f(r))
@@ -174,7 +180,7 @@ class MultiWorld(MazeWorld):
             for i, alist in enumerate(alists):
                 for j, agent in enumerate(self.agents):
                     agent.s = states[j]
-                    agent.position = self._index_to_cell(states[j])
+                    #agent.position = self._index_to_cell(states[j])
                     agent.action = alist[j]
                 # self.plot(fig, ax[0,0], colorMap=np.zeros(self.dims))
                 # ax[0,0].set_title(f"state={c}")
@@ -189,7 +195,7 @@ class MultiWorld(MazeWorld):
                 if len(seen) == n_agents:
                     for agent in self.agents:
                         agent.s = self.act(agent.s, agent.action)
-                        agent.position = self._index_to_cell(agent.s)
+                        #agent.position = self._index_to_cell(agent.s)
 
                 # self.plot(fig, ax[0, 1], colorMap=np.zeros(self.dims))
                 # ax[0, 1].set_title(f"in collision ={len(seen) != n_agents}")
@@ -271,6 +277,7 @@ class MultiWorld(MazeWorld):
             ax.plot(x, y, c = 'w')
 
         for i, agent in enumerate(self.agents):
+            agent.position = self._index_to_cell(agent.s)
             y, x = agent.position
             ax.add_patch(patches.Circle((x+.5, y+.5), .5, linewidth=1, edgecolor='k', facecolor='w'))
             dir = self.actions[agent.action]

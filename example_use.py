@@ -1,9 +1,9 @@
-from mazeworld import MazeWorld, WorldFactory
-from multiworld import MultiWorldFactory
-from pendulum import Pendulum
-from empowerment import BlahutArimoto, VisitCount, BlahutArimotoTimeOptimal, VisitCountFast
+from world.mazeworld import MazeWorld, WorldFactory
+from world.multiworld import MultiWorldFactory
+from world.pendulum import Pendulum
+from strategy.empowerment import BlahutArimoto, VisitCount, VisitCountFast
 from agent import EmpMaxAgent
-from variational_empowerment import VariationalEmpowerment
+from strategy.variational_empowerment import VariationalEmpowerment
 import numpy as np 
 import matplotlib.pyplot as plt
 import time 
@@ -239,29 +239,31 @@ def example_7():
 
 def example_8():
     np.random.seed(3)
-    f = MultiWorldFactory()
-    w = f.step_ma()
-    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(4, 4))
-    T = w.compute_ma_model(fig, ax)
+
+    fig, ax = plt.subplots(nrows=3, ncols=4, figsize=(8, 8))
+    n_step = 1
     strategy = VisitCountFast()
-    E = strategy.compute(world=w, T=T, n_step=1)
 
+    f = MultiWorldFactory()
+    w = f.tunnel_2agents()
+    start = time.time()
+    T = w.compute_ma_model()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
     idx = np.argsort(E)
-
     for j, agent in enumerate(w.agents):
         agent.s = w.slists[idx[0]][j]
-        agent.position = w._index_to_cell(agent.s)
         agent.action = '_'
 
     w.plot(fig, ax[0, 0], colorMap=np.zeros(w.dims))
-    ax[0,0].set_title("low empowerment")
+    ax[0, 0].set_title(f'{n_step}-step klyubin low')
 
     for j, agent in enumerate(w.agents):
         agent.s = w.slists[idx[-1]][j]
-        agent.position = w._index_to_cell(agent.s)
         agent.action = '_'
-    w.plot(fig, ax[0, 1], colorMap=np.ones(w.dims))
-    ax[0, 1].set_title("high empowerment")
+
+    w.plot(fig, ax[0, 1], colorMap=np.zeros(w.dims))
+    ax[0, 1].set_title(f'{n_step}-step klyubin high')
 
     plt.show()
 

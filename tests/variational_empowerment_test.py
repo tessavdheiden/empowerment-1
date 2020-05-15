@@ -1,8 +1,7 @@
 import unittest
-import numpy as np
 import torch
 
-from variational_empowerment import *
+from strategy.variational_empowerment import *
 
 class VETest(unittest.TestCase):
     def test_one_hot(self):
