@@ -81,12 +81,12 @@ class EmpMaxAgent:
         self.t += 1
         return self.tau
 
-    def update(self, s, a, s_, influence=0.):
+    def update(self, s, a, s_):
         # append experience, update model
         self.D[s_, a, s] += 1
         self.T[:, a, s] = normalize(self.D[:, a, s])
         # compute reward as empowerment achieved
-        r = self.estimateE(s_) + influence
+        r = self.estimateE(s_)
         self.E[s_] = r
         # update reward R
         self.R[s, a] = self.R[s, a] + self.alpha * (r - self.R[s, a])
@@ -108,4 +108,6 @@ class EmpMaxAgent:
     @property
     def value_map(self):
         return np.max(self.Q, axis=1)
+
+
 

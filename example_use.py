@@ -1,5 +1,6 @@
 from world.mazeworld import MazeWorld, WorldFactory
 from world.multiworld import MultiWorldFactory
+from world.socialworld import SocialWorldFactory
 from world.pendulum import Pendulum
 from strategy.empowerment import BlahutArimoto, VisitCount, VisitCountFast
 from agent import EmpMaxAgent
@@ -204,6 +205,60 @@ def example_6():
     plt.show()
 
 def example_7():
+    """ compute combined empowerment landscapes for all agents in multi-agent scenario"""
+    np.random.seed(3)
+
+    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))
+    n_step = 1
+    strategy = VisitCountFast()
+
+    f = MultiWorldFactory()
+
+    w = f.door2_2agents()
+    start = time.time()
+
+    T = w.compute_ma_transition(w.n_a)
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
+    idx = np.argsort(E)
+    for j, agent in enumerate(w.agents):
+        agent.s = w._index_to_location(idx[0], j)
+        agent.action = '_'
+
+    w.plot(fig, ax[0, 0], colorMap=np.zeros(w.dims))
+    ax[0, 0].set_title(f'{n_step}-step klyubin low')
+
+    for j, agent in enumerate(w.agents):
+        agent.s = w._index_to_location(idx[-1], j)
+        agent.action = '_'
+
+    w.plot(fig, ax[0, 1], colorMap=np.zeros(w.dims))
+    ax[0, 1].set_title(f'{n_step}-step klyubin high')
+
+    w = f.tunnel_2agents()
+    start = time.time()
+
+    T = w.compute_ma_transition(w.n_a)
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
+    idx = np.argsort(E)
+    for j, agent in enumerate(w.agents):
+        agent.s = w._index_to_location(idx[0], j)
+        agent.action = '_'
+
+    w.plot(fig, ax[1, 0], colorMap=np.zeros(w.dims))
+    ax[1, 0].set_title(f'{n_step}-step klyubin low')
+
+    for j, agent in enumerate(w.agents):
+        agent.s = w._index_to_location(idx[-1], j)
+        agent.action = '_'
+
+    w.plot(fig, ax[1, 1], colorMap=np.zeros(w.dims))
+    ax[1, 1].set_title(f'{n_step}-step klyubin high')
+
+    plt.show()
+
+def example_8():
     """ compute empowerment landscape and value map for single agents in multi-agent scenario"""
     fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(16, 8))
     np.random.seed(3)
@@ -223,7 +278,7 @@ def example_7():
     w.plot(fig, ax[0, 1], colorMap=a0.visited.reshape(*w.dims))
     ax[0, 1].set_title(f'visited agent 0')
 
-    traj = w.predict(a0.action_map, a1.s, a1.action, a0.n_step)
+    traj = w.predict(a0, a1.s, a1.action, a0.n_step)
     w.plot(fig, ax[0, 2], colorMap=a0.value_map.reshape(*w.dims), traj=traj)
     ax[0, 2].set_title(f'value map agent 0 and prediction agent 1')
 
@@ -233,61 +288,40 @@ def example_7():
     w.plot(fig, ax[1, 1], colorMap=a1.visited.reshape(*w.dims))
     ax[1, 1].set_title(f'visited agent 1')
 
-    traj = w.predict(a1.action_map, a0.s, a0.action, a1.n_step)
+    traj = w.predict(a1, a0.s, a0.action, a1.n_step)
     w.plot(fig, ax[1, 2], colorMap=a1.value_map.reshape(*w.dims), traj=traj)
     ax[1, 2].set_title(f'value map agent 1')
 
     plt.show()
 
-def example_8():
-    """ compute combined empowerment landscapes for all agents in multi-agent scenario"""
+
+def example_9():
     np.random.seed(3)
 
-    fig, ax = plt.subplots(nrows=3, ncols=4, figsize=(8, 8))
-    n_step = 1
-    strategy = VisitCountFast()
+    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))
+    f = SocialWorldFactory()
 
-    f = MultiWorldFactory()
+    w = f.simple_2agents()
 
-    w = f.klyubin_2agents()
-    start = time.time()
-    T = w.compute_ma_transition()
-    E = strategy.compute(world=w, T=T, n_step=n_step)
-    print(f"elapsed seconds: {time.time() - start:0.3f}")
-    idx = np.argsort(E)
-    for j, agent in enumerate(w.agents):
-        agent.s = w._index_to_location(idx[0], j)
-        agent.action = '_'
+    steps = int(1000)
+    for t in range(steps):
+        print(f"{t}/{steps}={t/steps*100:.1f}%")
+        w.interact(2)
+    a0 = w.agents[0]
+    a1 = w.agents[1]
 
-    w.plot(fig, ax[0, 0], colorMap=np.zeros(w.dims))
-    ax[0, 0].set_title(f'{n_step}-step klyubin low')
+    print(f"a0.E = {a0.E}, a1.E = {a1.E}")
+    w.plot(fig, ax[0, 0])
+    ax[0, 0].set_title(f'{a0.n_step}-step empowerment agent 0')
 
-    for j, agent in enumerate(w.agents):
-        agent.s = w._index_to_location(idx[-1], j)
-        agent.action = '_'
+    w.plot(fig, ax[0, 1], colorMap=a0.visited.reshape(*w.dims))
+    ax[0, 1].set_title(f'visited agent 0')
 
-    w.plot(fig, ax[0, 1], colorMap=np.zeros(w.dims))
-    ax[0, 1].set_title(f'{n_step}-step klyubin high')
+    w.plot(fig, ax[1, 0])
+    ax[1, 0].set_title(f'{a1.n_step}-step empowerment agent 1')
 
-    # w = f.door_3agents()
-    # start = time.time()
-    # T = w.compute_ma_transition()
-    # E = strategy.compute(world=w, T=T, n_step=n_step)
-    # print(f"elapsed seconds: {time.time() - start:0.3f}")
-    # idx = np.argsort(E)
-    # for j, agent in enumerate(w.agents):
-    #     agent.s = w._index_to_location(idx[0], j)
-    #     agent.action = '_'
-    #
-    # w.plot(fig, ax[0, 2], colorMap=np.zeros(w.dims))
-    # ax[0, 2].set_title(f'{n_step}-step door low')
-    #
-    # for j, agent in enumerate(w.agents):
-    #     agent.s = w._index_to_location(idx[-1], j)
-    #     agent.action = '_'
-    #
-    # w.plot(fig, ax[0, 3], colorMap=np.zeros(w.dims))
-    # ax[0, 3].set_title(f'{n_step}-step door high')
+    w.plot(fig, ax[1, 1], colorMap=a1.visited.reshape(*w.dims))
+    ax[1, 1].set_title(f'visited agent 1')
 
     plt.show()
 

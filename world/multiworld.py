@@ -31,6 +31,7 @@ class MultiWorld(MazeWorld):
         self.agents = []
         self.locations = list()
         self.grids = list()
+        self.a_list = list()
         self.n_s = height*width
         self.n_a = 0
 
@@ -41,13 +42,6 @@ class MultiWorld(MazeWorld):
         agent.set(position, action, self._cell_to_index(position), self.dims)
         self.agents.append(agent)
         self.n_a = len(self.agents)
-
-    def add_social_agent(self, position, action):
-        self.n_a = 2
-        position = np.array(position)
-        agent = Agent(T=self.compute_ma_transition(), det=1.)
-        agent.set(position, action, self._cell_to_index(position), self.dims)
-        self.agents.append(agent)
 
     def in_collision(self, s, a, s_, a_):
         """ are or will be on same location or move through each other
@@ -68,65 +62,27 @@ class MultiWorld(MazeWorld):
         else:
             return False
 
-    def act(self, s, a, prob=1.):
-        """ get updated state after action
-        s  : state, index of grid position
-        a : action
-        prob : probability of performing action
-        """
-        rnd = np.random.rand()
-        if rnd > prob:
-            a = np.random.choice(list(filter(lambda x: x != a, self.actions.keys())))
-        state = self._index_to_cell(s)
-        # hit wall
-        if a not in self.adjacencies[state[0]][state[1]]:
-            return s
-        new_state = state + self.actions[a]
-        # can't move off grid
-        if self.toroidal:
-            new_state = self.vecmod(new_state, self.dims)
-        else:
-            if np.any(new_state < np.zeros(2)) or np.any(new_state >= self.dims):
-                return s
-
-        return self._cell_to_index(new_state)
-
-    def generate_configs(self, n_states, n_agents):
-        which = np.array(list(itertools.combinations(range(n_states), n_agents)), dtype="int8")
-        grid = np.zeros((len(which), n_states), dtype="int8")
-        grid[np.arange(len(which))[None].T, which] = 1
-        return grid
-
-    def compute_ma_transition(self, det=1.):
-        alists = [al for al in itertools.product(self.actions.keys(), repeat=self.n_a)]
-        n_actions = len(alists)
-
-        self.locations = list(itertools.combinations(np.arange(self.n_s), self.n_a))
-        self.grids = self.generate_configs(self.n_s, self.n_a)
+    def compute_ma_transition(self, n_a, det=1.):
+        self.locations = list(itertools.combinations(np.arange(self.n_s), n_a))
+        self.grids = np.zeros((len(self.locations), self.n_s), dtype="int8")
+        self.grids[np.arange(len(self.locations))[None].T, self.locations] = 1
+        self.a_list = list(itertools.product(self.actions.keys(), repeat=n_a))
+        n_actions = len(self.a_list)
 
         n_configs = len(self.grids)
         # compute environment dynamics as a matrix T
         T = np.zeros([n_configs, n_actions, n_configs])
         # T[s',a,s] is the probability of landing in s' given action a is taken in state s.
 
-        for c in range(n_configs):
-            for i, alist in enumerate(alists):
-                for j, agent in enumerate(self.agents):
-                    agent.s = self._index_to_location(c, j)
-                    agent.action = alist[j]
-
-                seen = set()
-                for agent in self.agents:
-                    s_ = self.act(agent.s, agent.action)
-                    seen.add(s_)
+        for c, locs in enumerate(self.locations):
+            for i, alist in enumerate(self.a_list):
+                locs_new = [self.act(locs[j], alist[j]) for j in range(n_a)]
 
                 # any of the agents on same location, do not move
-                if len(seen) == self.n_a:
-                    for agent in self.agents:
-                        agent.s = self.act(agent.s, agent.action)
+                if len(set(locs_new)) != n_a:
+                    locs_new = locs
 
-                locs = [agent.s for agent in self.agents]
-                grid = self._location_to_grid(locs)
+                grid = self._location_to_grid(locs_new)
                 c_new = self._grid_to_index(grid)
                 T[c_new, i, c] += det
 
@@ -142,6 +98,10 @@ class MultiWorld(MazeWorld):
             grid[l] = 1
         return grid
 
+    def _location_to_index(self, locs):
+        grid = self._location_to_grid(locs)
+        return self._grid_to_index(grid)
+
     def _grid_to_index(self, grid):
         return np.where(np.all(self.grids == grid, axis=1))
 
@@ -153,32 +113,30 @@ class MultiWorld(MazeWorld):
         for i, agent in enumerate(self.agents):
             s = agent.s
             a = agent.act(s)
-            action = list(self.actions.keys())[a]
-            agent.action = action
-            s_ = self.act(s, action)
+            agent.action = list(self.actions.keys())[a]
+            s_ = self.act(s, agent.action)
 
-            influence = 0
-            for j, other in enumerate(self.agents[:i] + self.agents[i+1:]):
-                s_unc = set(map(lambda x : self.act(other.s, x), self.actions.keys())) # TODO: how many are already in collision of other agent
-                if self.in_collision(s_, action, other.s, other.action):
-                    influence -= 1 / len(s_unc)
+            for other in self.agents[:i] + self.agents[i+1:]:
+                if self.in_collision(s_, agent.action, other.s, other.action):
                     s_ = s
+                    break
 
             pos = self._index_to_cell(s_)
             agent.visited[pos[0], pos[1]] += 1
 
-            agent.update(s, a, s_, influence)
+            agent.update(s, a, s_)
             agent.s = s_
             agent.position = pos
 
-    def predict(self, action_map, s, a, n_step):
+
+    def predict(self, agent, s, a, n_step):
         traj = np.zeros((n_step+1, 2))
         traj[0, :] = self._index_to_cell(s)
         new_state = self._index_to_cell(s) + self.actions[a]
         state = self._index_to_cell(s) if np.any(new_state < np.zeros(2)) or np.any(new_state >= self.dims) else new_state
         for t in range(n_step):
             traj[t+1, :] = state
-            a = action_map[s]
+            a = agent.action_map[s]
             new_state = state + list(self.actions.values())[a]
             state = state if np.any(new_state < np.zeros(2)) or np.any(new_state >= self.dims) else new_state
             s = self._cell_to_index(state)
@@ -259,8 +217,8 @@ class MultiWorldFactory(WorldFactory):
 
     def simple_2agents(self):
         maze = self.simple()
-        maze.add_agent([1, 3], '_')
-        maze.add_agent([4, 3], 'E')
+        maze.add_agent([0, 1], '_')
+        maze.add_agent([1, 0], 'E')
         return maze
 
 
