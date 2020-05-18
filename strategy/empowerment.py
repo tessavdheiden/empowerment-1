@@ -35,7 +35,7 @@ def empowerment(T, det, n_step, state, n_samples=1000, epsilon=1e-6):
         State for which to compute the empowerment.
     """
     n_states, n_actions, _ = T.shape
-    if det:
+    if det==1:
         # only sample if too many actions sequences to iterate through
         if n_actions ** n_step < 5000:
             nstep_samples = np.array(list(itertools.product(range(n_actions), repeat=n_step)))
@@ -54,7 +54,8 @@ def empowerment(T, det, n_step, state, n_samples=1000, epsilon=1e-6):
         Bn = np.zeros([n_states, len(nstep_actions), n_states])
         for i, an in enumerate(nstep_actions):
             Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))
-        return blahut_arimoto(Bn[:, :, state], epsilon=epsilon)
+        q_x = _rand_dist((Bn.shape[1],))
+        return blahut_arimoto(Bn[:, :, state], q_x, epsilon=epsilon)
 
 
 class BlahutArimoto(EmpowermentStrategy):
@@ -72,12 +73,9 @@ class BlahutArimoto(EmpowermentStrategy):
         for i, an in enumerate(nstep_actions):
             Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: T[:, a, :]), an))
 
-        E = np.zeros(world.dims)
-        for y in range(world.dims[0]):
-            for x in range(world.dims[1]):
-                idx = int(y*world.dims[1] + x)
-                s = world._cell_to_index((y, x))
-                E[y, x] = blahut_arimoto(Bn[:, :, s], self.q_x[:, idx], epsilon=epsilon)
+        E = np.zeros(n_states)
+        for s in range(n_states):
+            E[s] = blahut_arimoto(Bn[:, :, s], self.q_x[:, s], epsilon=epsilon)
 
         return E
 
@@ -99,15 +97,13 @@ class VisitCount(EmpowermentStrategy):
         # fold over each nstep actions, get unique end states
         tmap = lambda s, a: np.argmax(T[:, a, s])
 
-        E = np.zeros(world.dims)
-        for y in range(world.dims[0]):
-            for x in range(world.dims[1]):
-                s = world._cell_to_index((y, x))
-                seen = set()
-                for i in range(len(nstep_samples)):
-                    aseq = nstep_samples[i,:]
-                    seen.add(reduce(tmap, [s,*aseq]))
-                E[y, x] = np.log2(len(seen)) # empowerment = log # of reachable states
+        E = np.zeros(n_states)
+        for s in range(n_states):
+            seen = set()
+            for i in range(len(nstep_samples)):
+                aseq = nstep_samples[i,:]
+                seen.add(reduce(tmap, [s,*aseq]))
+            E[s] = np.log2(len(seen)) # empowerment = log # of reachable states
         return E
 
 

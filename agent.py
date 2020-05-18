@@ -99,7 +99,7 @@ class EmpMaxAgent:
                 self.Q[s, a] = self.R[s, a] + self.gamma * (np.sum(self.T[:, a, s] * np.max(self.Q, axis=1)))
 
     def estimateE(self, state):
-        return empowerment(self.T, self.det, self.n_step, state, n_samples = self.n_samples)
+        return empowerment(self.T, self.det == 1., self.n_step, state, n_samples = self.n_samples)
 
     @property
     def action_map(self):

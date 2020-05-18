@@ -10,8 +10,8 @@ from world.mazeworld import MazeWorld, WorldFactory
 
 
 class Agent(EmpMaxAgent):
-    def __init__(self, T, det):
-        super().__init__(T, det, alpha=0.1, gamma=0.9, n_step=2, n_samples=1000)
+    def __init__(self, T, det, n_step):
+        super().__init__(T, det, alpha=0.1, gamma=0.9, n_step=n_step, n_samples=1000)
 
     def set(self, position, action, s, dims):
         self.s = s
@@ -38,7 +38,7 @@ class MultiWorld(MazeWorld):
     def add_agent(self, position, action):
         position = np.array(position)
         emptymaze = MazeWorld(self.height, self.width)
-        agent = Agent(T=emptymaze.compute_transition(), det=1.)
+        agent = Agent(T=emptymaze.compute_transition(), det=.9, n_step=1)
         agent.set(position, action, self._cell_to_index(position), self.dims)
         self.agents.append(agent)
         self.n_a = len(self.agents)
@@ -65,6 +65,7 @@ class MultiWorld(MazeWorld):
     def compute_ma_transition(self, n_a, det=1.):
         self.locations = list(itertools.combinations(np.arange(self.n_s), n_a))
         self.grids = np.zeros((len(self.locations), self.n_s), dtype="int8")
+        #np.put_along_axis(self.grids, np.asarray(self.locations), 1, axis=1)
         self.grids[np.arange(len(self.locations))[None].T, self.locations] = 1
         self.a_list = list(itertools.product(self.actions.keys(), repeat=n_a))
         n_actions = len(self.a_list)
@@ -76,7 +77,7 @@ class MultiWorld(MazeWorld):
 
         for c, locs in enumerate(self.locations):
             for i, alist in enumerate(self.a_list):
-                locs_new = [self.act(locs[j], alist[j]) for j in range(n_a)]
+                locs_new = [self.act(locs[j], alist[j], det) for j in range(n_a)]
 
                 # any of the agents on same location, do not move
                 if len(set(locs_new)) != n_a:
@@ -86,6 +87,12 @@ class MultiWorld(MazeWorld):
                 c_new = self._grid_to_index(grid)
                 T[c_new, i, c] += det
 
+                locs_unc = [list(map(lambda x: self.act(locs[j], x, det), filter(lambda x: x != alist[j], self.actions.keys()))) for j in range(n_a)]
+
+                for lu in locs_unc:
+                    c_unc = self._location_to_index(lu)
+                    T[c_unc, i, c] += (1 - det) / (len(c_unc))
+
         self.T = T
         return T
 
@@ -94,8 +101,7 @@ class MultiWorld(MazeWorld):
 
     def _location_to_grid(self, locs):
         grid = np.zeros(self.n_s)
-        for l in locs:
-            grid[l] = 1
+        np.put(grid, locs, 1)
         return grid
 
     def _location_to_index(self, locs):

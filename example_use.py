@@ -2,7 +2,7 @@ from world.mazeworld import MazeWorld, WorldFactory
 from world.multiworld import MultiWorldFactory
 from world.socialworld import SocialWorldFactory
 from world.pendulum import Pendulum
-from strategy.empowerment import BlahutArimoto, VisitCount, VisitCountFast
+from strategy.empowerment import BlahutArimoto, VisitCount, VisitCountFast, BlahutArimotoTimeOptimal
 from agent import EmpMaxAgent
 from strategy.variational_empowerment import VariationalEmpowerment
 import numpy as np 
@@ -71,24 +71,26 @@ def example_3():
     print("elapsed seconds: %0.3f" % (time.time() - start) )
     # some plotting
     fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(9, 3))
+    #Amap = np.array([list(maze.actions.values())[i] for i in agent.action_map])
+    #ax[0, 0].quiver(np.arange(maze.width) + .5, np.arange(maze.height) + .5, Amap[:, 1].reshape(maze.height, maze.width), Amap[:, 0].reshape(maze.height, maze.width))
+
+    maze.plot(fig, ax[0, 0], colorMap= agent.E.reshape(*maze.dims))
+    ax[0, 0].set_title('subjective empowerment')
+
+    maze.plot(fig, ax[0,1], colorMap=visited.reshape(*maze.dims))
+    ax[0, 1].set_title('visited')
+
     Vmap = agent.value_map.reshape(*maze.dims)
-    maze.plot(fig, ax[0, 0], colorMap= Vmap)
-    ax[0, 0].set_title('value map')
-    Amap = np.array([list(maze.actions.values())[i] for i in agent.action_map])
-    ax[0, 0].quiver(np.arange(maze.width) + .5, np.arange(maze.height) + .5, Amap[:, 1].reshape(maze.height, maze.width), Amap[:, 0].reshape(maze.height, maze.width))
+    maze.plot(fig, ax[0, 2], colorMap= Vmap)
+    ax[0, 2].set_title('value map')
 
-    maze.plot(fig, ax[0, 1], colorMap= agent.E.reshape(*maze.dims))
-    ax[0, 1].set_title('subjective empowerment')
 
-    ax[0, 2].set_title("tau")
-    ax[0, 2].plot(tau)
+    ax[1, 1].set_title("tau")
+    ax[1, 1].plot(tau)
 
     ax[1, 0].scatter(agent.E, visited.reshape(n_s))
     ax[1, 0].set_xlabel('true empowerment')
     ax[1, 0].set_ylabel('visit frequency')
-
-    maze.plot(fig, ax[1,1], colorMap=visited.reshape(*maze.dims))
-    ax[1, 1].set_title('visited')
 
     red = 'tab:red'
     ax[1, 2].plot(D_emp, color=red)
@@ -208,16 +210,16 @@ def example_7():
     """ compute combined empowerment landscapes for all agents in multi-agent scenario"""
     np.random.seed(3)
 
-    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))
+    fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(7, 4))
     n_step = 1
-    strategy = VisitCountFast()
+    strategy = BlahutArimotoTimeOptimal()
 
     f = MultiWorldFactory()
 
-    w = f.door2_2agents()
+    w = f.simple_2agents()
     start = time.time()
 
-    T = w.compute_ma_transition(w.n_a)
+    T = w.compute_ma_transition(w.n_a, det=.9)
     E = strategy.compute(world=w, T=T, n_step=n_step)
     print(f"elapsed seconds: {time.time() - start:0.3f}")
     idx = np.argsort(E)
@@ -225,36 +227,15 @@ def example_7():
         agent.s = w._index_to_location(idx[0], j)
         agent.action = '_'
 
-    w.plot(fig, ax[0, 0], colorMap=np.zeros(w.dims))
-    ax[0, 0].set_title(f'{n_step}-step klyubin low')
+    w.plot(fig, ax[0], colorMap=np.zeros(w.dims))
+    ax[0].set_title(f'{n_step}-step E={E[idx[0]]:.2f} low')
 
     for j, agent in enumerate(w.agents):
         agent.s = w._index_to_location(idx[-1], j)
         agent.action = '_'
 
-    w.plot(fig, ax[0, 1], colorMap=np.zeros(w.dims))
-    ax[0, 1].set_title(f'{n_step}-step klyubin high')
-
-    w = f.tunnel_2agents()
-    start = time.time()
-
-    T = w.compute_ma_transition(w.n_a)
-    E = strategy.compute(world=w, T=T, n_step=n_step)
-    print(f"elapsed seconds: {time.time() - start:0.3f}")
-    idx = np.argsort(E)
-    for j, agent in enumerate(w.agents):
-        agent.s = w._index_to_location(idx[0], j)
-        agent.action = '_'
-
-    w.plot(fig, ax[1, 0], colorMap=np.zeros(w.dims))
-    ax[1, 0].set_title(f'{n_step}-step klyubin low')
-
-    for j, agent in enumerate(w.agents):
-        agent.s = w._index_to_location(idx[-1], j)
-        agent.action = '_'
-
-    w.plot(fig, ax[1, 1], colorMap=np.zeros(w.dims))
-    ax[1, 1].set_title(f'{n_step}-step klyubin high')
+    w.plot(fig, ax[1], colorMap=np.zeros(w.dims))
+    ax[1].set_title(f'{n_step}-step E={E[idx[-1]]:.2f} high')
 
     plt.show()
 
@@ -296,32 +277,94 @@ def example_8():
 
 
 def example_9():
+    """ compute empowerment landscape and value map for collaborating agents in multi-agent scenario"""
     np.random.seed(3)
 
-    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 8))
+    fig, ax = plt.subplots(nrows=2, ncols=5, figsize=(16, 8))
     f = SocialWorldFactory()
-
+    start = time.time()
     w = f.simple_2agents()
-
+    print(f"elapsed seconds: {time.time() - start:0.3f}")
     steps = int(1000)
     for t in range(steps):
-        print(f"{t}/{steps}={t/steps*100:.1f}%")
+        start = time.time()
         w.interact(2)
-    a0 = w.agents[0]
-    a1 = w.agents[1]
+        print(f"progress: {t}/{steps}={t / steps * 100:.1f}% elapsed seconds: {time.time() - start:0.3f}")
 
-    print(f"a0.E = {a0.E}, a1.E = {a1.E}")
-    w.plot(fig, ax[0, 0])
-    ax[0, 0].set_title(f'{a0.n_step}-step empowerment agent 0')
+        a0 = w.agents[0]
+        a1 = w.agents[1]
 
-    w.plot(fig, ax[0, 1], colorMap=a0.visited.reshape(*w.dims))
-    ax[0, 1].set_title(f'visited agent 0')
+        w.plot(fig, ax[0, 2], colorMap=a0.visited.reshape(*w.dims))
+        ax[0, 2].set_title(f'visited agent 0')
 
-    w.plot(fig, ax[1, 0])
-    ax[1, 0].set_title(f'{a1.n_step}-step empowerment agent 1')
+        w.plot(fig, ax[1, 2], colorMap=a1.visited.reshape(*w.dims))
+        ax[1, 2].set_title(f'visited agent 1')
 
-    w.plot(fig, ax[1, 1], colorMap=a1.visited.reshape(*w.dims))
-    ax[1, 1].set_title(f'visited agent 1')
+        actions=[]
+        states=[]
+        for j, agent in enumerate(w.agents):
+            states.append(agent.s)
+            actions.append(agent.action)
+
+        idx = np.argsort(a0.E)
+        for j, agent in enumerate(w.agents):
+            agent.s = w._index_to_location(idx[0], j)
+            agent.action = '_'
+        w.plot(fig, ax[0, 0])
+        ax[0, 0].set_title(f'agent 0 low E={a0.E[idx[0]]:.2f}')
+
+        for j, agent in enumerate(w.agents):
+            agent.s = w._index_to_location(idx[-1], j)
+            agent.action = '_'
+        w.plot(fig, ax[0, 1])
+        ax[0, 1].set_title(f'agent 0 high E={a0.E[idx[-1]]:.2f}')
+
+        idx = np.argsort(a0.value_map)
+        for j, agent in enumerate(w.agents):
+            agent.s = w._index_to_location(idx[0], j)
+            agent.action = '_'
+        w.plot(fig, ax[0, 3])
+        ax[0, 3].set_title(f'agent 0 low V={a0.value_map[idx[0]]:.2f}')
+
+        for j, agent in enumerate(w.agents):
+            agent.s = w._index_to_location(idx[-1], j)
+            agent.action = '_'
+        w.plot(fig, ax[0, 4])
+        ax[0, 4].set_title(f'agent 0 high V={a0.value_map[idx[-1]]:.2f}')
+
+        # second agent
+        idx = np.argsort(a1.E)
+        for j, agent in enumerate(w.agents):
+            agent.s = w._index_to_location(idx[0], j)
+            agent.action = '_'
+        w.plot(fig, ax[1, 0])
+        ax[1, 0].set_title(f'agent 1 low E={a1.E[idx[0]]:.2f}')
+
+        for j, agent in enumerate(w.agents):
+            agent.s = w._index_to_location(idx[-1], j)
+            agent.action = '_'
+        w.plot(fig, ax[1, 1])
+        ax[1, 1].set_title(f'agent 1 high E={a1.E[idx[-1]]:.2f}')
+
+        idx = np.argsort(a1.value_map)
+        for j, agent in enumerate(w.agents):
+            agent.s = w._index_to_location(idx[0], j)
+            agent.action = '_'
+        w.plot(fig, ax[1, 3])
+        ax[1, 3].set_title(f'agent 1 low V={a1.value_map[idx[0]]:.2f}')
+
+        for j, agent in enumerate(w.agents):
+            agent.s = w._index_to_location(idx[-1], j)
+            agent.action = '_'
+        w.plot(fig, ax[1, 4])
+        ax[1, 4].set_title(f'agent 1 high V={a1.value_map[idx[-1]]:.2f}')
+
+
+        for j, agent in enumerate(w.agents):
+            agent.s = states[j]
+            agent.action = actions[j]
+
+        plt.pause(.001)
 
     plt.show()
 
@@ -333,4 +376,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_8()
+    example_9()
