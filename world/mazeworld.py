@@ -53,7 +53,7 @@ class MazeWorld(World):
 
     def act(self, s, a, prob = 1.):
         """ get updated state after action
-    
+
         s  : state, index of grid position 
         a : action 
         prob : probability of performing action
@@ -77,7 +77,7 @@ class MazeWorld(World):
         for a in actions:
             s = self.act(s, a)
         return s
-    
+
     def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None):
         G = np.zeros(self.dims) if colorMap is None else colorMap.copy()
         # plot color map
@@ -198,7 +198,7 @@ class WorldFactory(object):
         return maze
 
     def simple(self):
-        maze = self.create_maze_world(height=4, width=3)
+        maze = self.create_maze_world(height=6, width=3)
         maze.add_wall([0, 0], "N")
         maze.add_wall([0, 1], "N")
         return maze

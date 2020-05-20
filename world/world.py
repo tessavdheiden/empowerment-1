@@ -3,10 +3,10 @@ import itertools
 import numpy as np
 
 class World(object):
-    def act(self):
+    def act(self, s, a):
         raise NotImplementedError
 
-    def plot(self):
+    def plot(self, fig, ax):
         raise NotImplementedError
 
     def _index_to_cell(self, s):
