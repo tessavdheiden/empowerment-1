@@ -198,7 +198,7 @@ class WorldFactory(object):
         return maze
 
     def simple(self):
-        maze = self.create_maze_world(height=6, width=3)
+        maze = self.create_maze_world(height=4, width=3)
         maze.add_wall([0, 0], "N")
         maze.add_wall([0, 1], "N")
         return maze

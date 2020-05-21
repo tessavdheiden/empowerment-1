@@ -106,19 +106,20 @@ class MultiWorld(MazeWorld):
                 locs_new = [self.act(locs[j], alist[j], det) for j in range(n_a)]
 
                 # any of the agents on same location, do not move
-                if len(set(locs_new)) < n_a:
+                if len(set(locs_new)) < n_a or (locs[0] == locs_new[1] and locs[1] == locs_new[0]):
                     locs_new = locs
 
                 c_new = self._location_to_index(locs_new)
                 T[c_new, i, c] += det
 
+                if det == 1: continue
                 locs_unc = np.array([list(map(lambda x: self.act(locs[j], x, det), filter(lambda x: x != alist[j], self.actions.keys()))) for j in range(n_a)]).T
                 assert locs_unc.shape == ((len(self.actions) - 1), n_a)
 
                 for lu in locs_unc:
                     if np.all(lu == lu[0]): continue # collision
                     c_unc = self._location_to_index(lu)
-                    T[c_unc, i, c] += (1 - det) / (len(c_unc))
+                    T[c_unc, i, c] += (1 - det) / (len(locs_unc))
 
         self.T = T
         return T
@@ -128,6 +129,8 @@ class MultiWorld(MazeWorld):
         """
         new_s = list()
         old_s = [agent.s for agent in self.agents]
+        assert len(set(old_s)) == self.n_a
+
         for i, agent in enumerate(self.agents):
             a = agent.decide(old_s[i])
             action = list(self.actions.keys())[a]
@@ -146,6 +149,8 @@ class MultiWorld(MazeWorld):
             agent.set_s(s_)
             agent.set_cell(self._index_to_cell(s_))
 
+        return new_s
+
     def predict_trajectory(self, agent, target, t_step):
         """ Computes new locations of one agent (target), based on the value function of another (agent).
         """
@@ -163,9 +168,9 @@ class MultiWorld(MazeWorld):
         return self.locations[c][j]
 
     def _location_to_index(self, locs):
-        return np.where(np.all(self.locations == locs, axis=1))[0]
+        return np.where(np.all(self.locations == locs, axis=1))[0][0]
 
-    def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None, show_entities=True, cmap='viridis'):
+    def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None, cmap='viridis'):
         ax.clear()
         G = np.zeros(self.dims) if colorMap is None else colorMap.copy()
         # plot color map
@@ -173,7 +178,7 @@ class MultiWorld(MazeWorld):
             im = ax.pcolor(G, vmin=vmin, vmax=vmax, cmap=cmap)
         else:
             im = ax.pcolor(G, cmap=cmap)
-        #fig.colorbar(im, ax=ax)
+        fig.colorbar(im, ax=ax)
         if pos is not None:
             ax.scatter([pos[1] + 0.5], [pos[0] + 0.5], s = 100, c = 'w')
         # plot trajectory
@@ -183,22 +188,21 @@ class MultiWorld(MazeWorld):
             x = np.array(x) + 0.5
             ax.plot(x, y, c = 'b')
 
-        if show_entities:
-            for wall in self.walls:
-                y, x = zip(*wall)
-                (y, x) = ([max(y), max(y)], [x[0], x[0] + 1]) if x[0] == x[1] else ([y[0], y[0] + 1], [max(x), max(x)])
-                ax.plot(x, y, c = 'w')
-
-            for i, agent in enumerate(self.agents):
-                y, x = self._index_to_cell(agent.s)
-                ax.add_patch(patches.Circle((x+.5, y+.5), .5, linewidth=1, edgecolor='k', facecolor='w'))
-                dir = self.actions[agent.get_action()]
-                ax.arrow(x+.5, y+.5, dir[1]/2, dir[0]/2)
-                ax.text(x+.5, y+.25, i, horizontalalignment='center', verticalalignment='center')
-
         if action is not None:
             ax.set_title(str(action))
 
+    def plot_entities(self, fig, ax):
+        for wall in self.walls:
+            y, x = zip(*wall)
+            (y, x) = ([max(y), max(y)], [x[0], x[0] + 1]) if x[0] == x[1] else ([y[0], y[0] + 1], [max(x), max(x)])
+            ax.plot(x, y, c = 'w')
+
+        for i, agent in enumerate(self.agents):
+            y, x = self._index_to_cell(agent.s)
+            ax.add_patch(patches.Circle((x+.5, y+.5), .5, linewidth=1, edgecolor='k', facecolor='w'))
+            dir = self.actions[agent.get_action()]
+            ax.arrow(x+.5, y+.5, dir[1]/2, dir[0]/2)
+            ax.text(x+.5, y+.25, i, horizontalalignment='center', verticalalignment='center')
 
 
 class MultiWorldFactory(WorldFactory):
