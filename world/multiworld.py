@@ -40,8 +40,12 @@ class Agent(object):
     def get_action(self):
         return self.action
 
+    def get_a(self):
+        return self.a
+
     def predict_a(self, s):
         return self.brain.action_map[s]
+
 
 class MultiWorld(MazeWorld):
     """ Represents an n x m grid world with walls at various locations and other agents.
@@ -89,13 +93,10 @@ class MultiWorld(MazeWorld):
 
     def compute_ma_transition(self, n_a, det=1.):
         self.locations = np.array(list(itertools.permutations(np.arange(self.n_s), n_a)))
-        self.grids = np.zeros((len(self.locations), self.n_s), dtype="int8")
-        #np.put_along_axis(self.grids, np.asarray(self.locations), 1, axis=1)
-        self.grids[np.arange(len(self.locations))[None].T, self.locations] = 1
         self.a_list = list(itertools.product(self.actions.keys(), repeat=n_a))
         n_actions = len(self.a_list)
 
-        n_configs = len(self.grids)
+        n_configs = len(self.locations)
         # compute environment dynamics as a matrix T
         T = np.zeros([n_configs, n_actions, n_configs])
         # T[s',a,s] is the probability of landing in s' given action a is taken in state s.
@@ -108,11 +109,11 @@ class MultiWorld(MazeWorld):
                 if len(set(locs_new)) < n_a:
                     locs_new = locs
 
-                grid = self._location_to_grid(locs_new)
-                c_new = self._grid_to_index(grid)
+                c_new = self._location_to_index(locs_new)
                 T[c_new, i, c] += det
 
                 locs_unc = np.array([list(map(lambda x: self.act(locs[j], x, det), filter(lambda x: x != alist[j], self.actions.keys()))) for j in range(n_a)]).T
+                assert locs_unc.shape == ((len(self.actions) - 1), n_a)
 
                 for lu in locs_unc:
                     if np.all(lu == lu[0]): continue # collision
@@ -138,8 +139,9 @@ class MultiWorld(MazeWorld):
         if len(set(new_s)) < self.n_a:
             new_s = old_s
 
+        # update q-function
         for i, agent in enumerate(self.agents):
-            agent.rewire(old_s[i], agent.a, new_s[i])
+            agent.rewire(old_s[i], agent.get_a(), new_s[i])
             s_ = new_s[i]
             agent.set_s(s_)
             agent.set_cell(self._index_to_cell(s_))
@@ -160,18 +162,10 @@ class MultiWorld(MazeWorld):
     def _index_to_location(self, c, j):
         return self.locations[c][j]
 
-    def _location_to_grid(self, locs):
-        grid = np.zeros(self.n_s)
-        np.put(grid, locs, 1)
-        return grid
-
     def _location_to_index(self, locs):
         return np.where(np.all(self.locations == locs, axis=1))[0]
 
-    def _grid_to_index(self, grid):
-        return np.where(np.all(self.grids == grid, axis=1))
-
-    def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None,cmap='viridis'):
+    def plot(self, fig, ax, pos=None, traj=None, action=None, colorMap=None, vmin=None, vmax=None, show_entities=True, cmap='viridis'):
         ax.clear()
         G = np.zeros(self.dims) if colorMap is None else colorMap.copy()
         # plot color map
@@ -188,19 +182,19 @@ class MultiWorld(MazeWorld):
             y = np.array(y) + 0.5
             x = np.array(x) + 0.5
             ax.plot(x, y, c = 'b')
-            dir = x[-2:], y[-2:]
 
-        for wall in self.walls:
-            y, x = zip(*wall)
-            (y, x) = ([max(y), max(y)], [x[0], x[0] + 1]) if x[0] == x[1] else ([y[0], y[0] + 1], [max(x), max(x)])
-            ax.plot(x, y, c = 'w')
+        if show_entities:
+            for wall in self.walls:
+                y, x = zip(*wall)
+                (y, x) = ([max(y), max(y)], [x[0], x[0] + 1]) if x[0] == x[1] else ([y[0], y[0] + 1], [max(x), max(x)])
+                ax.plot(x, y, c = 'w')
 
-        for i, agent in enumerate(self.agents):
-            y, x = self._index_to_cell(agent.s)
-            ax.add_patch(patches.Circle((x+.5, y+.5), .5, linewidth=1, edgecolor='k', facecolor='w'))
-            dir = self.actions[agent.action]
-            ax.arrow(x+.5, y+.5, dir[1]/2, dir[0]/2)
-            ax.text(x+.5, y+.25, i, horizontalalignment='center', verticalalignment='center')
+            for i, agent in enumerate(self.agents):
+                y, x = self._index_to_cell(agent.s)
+                ax.add_patch(patches.Circle((x+.5, y+.5), .5, linewidth=1, edgecolor='k', facecolor='w'))
+                dir = self.actions[agent.get_action()]
+                ax.arrow(x+.5, y+.5, dir[1]/2, dir[0]/2)
+                ax.text(x+.5, y+.25, i, horizontalalignment='center', verticalalignment='center')
 
         if action is not None:
             ax.set_title(str(action))

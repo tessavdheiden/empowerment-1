@@ -1,8 +1,5 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-import math
-import itertools
+import copy
 
 from world.multiworld import MultiWorld, Agent
 
@@ -15,46 +12,69 @@ class SocialWorld(MultiWorld):
     def __init__(self, height, width, toroidal = False):
         super().__init__(height, width, toroidal)
 
+    def add_social_agent(self, cell, action, T):
+        cell = np.array(cell)
+        T = copy.deepcopy(T)
+        agent = Agent(T=T, det=1)
+        agent.set_cell(cell)
+        agent.set_s(self._cell_to_index(cell))
+        agent.set_action(action)
 
-    def add_social_agent(self, position, action, T):
-        position = np.array(position)
-        agent = Agent(T=T.copy(), det=.9, n_step=1)
-        agent.set(position, action, self._cell_to_index(position), self.dims)
         self.agents.append(agent)
         self.n_a = len(self.agents)
 
-    def interact(self, n_a, det=1.):
-        """ Computes probabilistic model T[s',a,s] corresponding to the maze world.
-        det : float between 0 and 1
-            Probability of action successfully performed (otherwise a random different action is performed with probability 1 - det). When det = 1 the dynamics are deterministic.
+    def interact_ma(self, n_a, det=1.):
+        """ Computes new locations and update actions for each agent if no collisions.
         """
+        c = np.random.randint(len(self.locations))
+
+        i = self.agents[0].decide(c)
+        #i = np.random.randint(len(self.a_list))
+
         locs = [agent.s for agent in self.agents]
-        c = self._location_to_index(locs)
-        locs_new = []
-        a_new = []
-        for i, agent in enumerate(self.agents):
-            a = agent.act(c)
-            a = np.random.randint(len(self.a_list))
+        locs_new = [self.act(self.locations[c][j], self.a_list[i][j], det) for j in range(n_a)]
 
-            action = self.a_list[a][i]
-            a_new.append(a)
-
-            agent.action = action
-            s_ = self.act(locs[i], action)
-            locs_new.append(s_)
-
-        # collision
-        if len(set(locs_new)) != n_a:
+        # any of the agents on same location, do not move
+        if len(set(locs_new)) < n_a:
             locs_new = locs
 
-        c_new = self._location_to_index(locs_new)[0][0]
-        for i, agent in enumerate(self.agents):
-            s_ = locs_new[i]
-            pos = self._index_to_cell(s_)
-            agent.visited[pos[0], pos[1]] += 1
-            agent.position = pos
-            agent.s = s_
-            agent.update(c, a_new[i], c_new)
+        assert len(locs_new) == n_a
+        c_new = self._location_to_index(locs_new)[0] #np.argmax(self.T[:, i, c])
+        for j, agent in enumerate(self.agents):
+            agent.rewire(c, i, c_new)
+            agent.brain.update_tau()
+            agent.set_s(self._index_to_location(c_new, j))
+            agent.set_action(self.a_list[i][j])
+            agent.set_cell(self._index_to_cell(agent.s))
+
+        #
+        # new_s = list()
+        # old_s = [agent.s for agent in self.agents]
+        # old_c = self._location_to_index(old_s)
+        # for i, agent in enumerate(self.agents):
+        #     a = agent.decide(old_c)
+        #     a = np.random.randint(len(self.a_list))
+        #     a_lst = self.a_list[a]
+        #     new_s.append([self.act(agent.s, action) for action in a_lst]) # agent i chooses actions for other agents
+        #     agent.set_a(a)
+        #     agent.set_action(a_lst[i])
+        #
+        # for i, agent in enumerate(self.agents):
+        #     # collision
+        #     if len(set(new_s[i])) < self.n_a: # TODO: switch places allowed
+        #         new_s[i] = old_s
+        #
+        # assert (len(new_s) == n_a) and (len(new_s[0]) == n_a)
+        # # update q-function
+        # for i, agent in enumerate(self.agents):
+        #     new_c = self._location_to_index(new_s[0])
+        #     a = self.agents[0].get_a()
+        #     agent.rewire(old_c.item(0), a, new_c.item(0))
+        #     s_ = new_s[0][i]
+        #     agent.set_s(s_)
+        #     agent.set_cell(self._index_to_cell(s_))
+        #     agent.set_a(a)
+        #     agent.set_action(self.agents[0].get_action())
 
 from world.mazeworld import WorldFactory
 
@@ -62,23 +82,31 @@ class SocialWorldFactory(WorldFactory):
     def create_maze_world(self, height, width):
         return SocialWorld(height, width)
 
+    def empty_2agents(self):
+        maze = self.create_maze_world(height=6, width=3)
+        T = maze.compute_ma_transition(2, det=1)
+        maze.add_social_agent([0, 1], '_', T)
+        maze.add_social_agent([1, 0], 'E', T)
+        return maze
+
     def simple_2agents(self):
         maze = self.simple()
-        T = maze.compute_ma_transition(2, det=.1)
+        emptymaze = self.create_maze_world(height=maze.height, width=maze.width)
+        T = emptymaze.compute_ma_transition(2, det=1)
+        maze.add_social_agent([0, 1], '_', T)
         maze.add_social_agent([1, 0], 'E', T)
-        maze.add_social_agent([0, 1], 'E', T)
         return maze
 
     def door2_2agents(self):
         maze = self.door2_world()
-        T = maze.compute_ma_transition(2, det=.1)
+        T = maze.compute_ma_transition(2, det=1)
         maze.add_social_agent([1, 3], '_', T)
         maze.add_social_agent([4, 3], 'E', T)
         return maze
 
     def klyubin_world_2agents(self):
         maze = self.klyubin_world()
-        T = maze.compute_ma_transition(2, det=1.)
+        T = maze.compute_ma_transition(2, det=1)
         maze.add_social_agent([1, 3], '_', T)
         maze.add_social_agent([4, 3], 'E', T)
         return maze
