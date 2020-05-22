@@ -303,16 +303,18 @@ def example_7():
     w.compute_ma_transition(2)
     for agent in w.agents:
         agent.load_params()
-        agent.tau = 0
 
     s = [agent.s for agent in w.agents]
     c = w._location_to_index(s)
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(4, 4))
     for _ in range(100):
-        c_ = w.interact(c)
+        c_ = w.interact(c, eval=True)
+        traj = w.predict_trajectory(w.agents[0], 4)
         w.plot(fig, ax)
         w.plot_entities(fig, ax)
+        ax.plot(traj[:, 0, 1]+.5, traj[:, 0, 0]+.5, c='b')
+        ax.plot(traj[:, 1, 1] + .5, traj[:, 1, 0] + .5, c='r')
         ax.set_title(f'a0={w.agents[0].brain.value_map[c]:.2f}')
         plt.pause(1)
         c = c_
@@ -327,4 +329,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_6()
+    example_7()

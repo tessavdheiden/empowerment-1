@@ -26,8 +26,8 @@ class Agent(object):
     def set_a(self, a):
         self.a = a
 
-    def decide(self, s):
-        return self.brain.act(s)
+    def decide(self, s, learn=True):
+        return self.brain.act(s) if learn else np.argmax(self.brain.Q[s, :])
 
     def rewire(self, s, a, s_):
         self.brain.update(s, a, s_)
