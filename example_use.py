@@ -231,14 +231,16 @@ def example_6():
     n_s, n_a, _ = B.shape
 
     # agent
-    w.agents[0].load_params()
+    #w.agents[0].load_params()
     brain = w.agents[0].brain
-    brain.decay = 5e-5
+    for agent in w.agents:
+        agent.brain.decay = 5e-5
 
     # training loop
     start = time.time()
-    D_emp, D_mod, steps, tau, visited, visited_config = train_ma_agent(B, E, brain, w, n_s, n_a, True)
-    w.agents[0].save_params()
+    D_emp, D_mod, steps, tau, visited, visited_config = train_ma_agent(B, E, brain, w, n_s, n_a)
+    for agent in w.agents:
+        agent.save_params()
 
     print("elapsed seconds: %0.3f" % (time.time() - start) )
     # some plotting
@@ -293,6 +295,29 @@ def example_6():
 
     print(f'min = {np.min(Vmap):.2f}, max = {np.max(Vmap):.2f}')
     plt.show()
+
+
+def example_7():
+    f = SocialWorldFactory()
+    w = f.simple_2agents()
+    w.compute_ma_transition(2)
+    for agent in w.agents:
+        agent.load_params()
+        agent.tau = 0
+
+    s = [agent.s for agent in w.agents]
+    c = w._location_to_index(s)
+
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(4, 4))
+    for _ in range(100):
+        c_ = w.interact(c)
+        w.plot(fig, ax)
+        w.plot_entities(fig, ax)
+        ax.set_title(f'a0={w.agents[0].brain.value_map[c]:.2f}')
+        plt.pause(1)
+        c = c_
+
+
 
 
 if __name__ == "__main__":

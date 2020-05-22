@@ -47,6 +47,9 @@ class Agent(object):
     def predict_a(self, s):
         return self.brain.action_map[s]
 
+    def predict_s(self, s, a):
+        return np.argmax(self.brain.T[:, a, s])
+
     def save_params(self):
         params = dict(vars(self.brain))
         with open('params.pkl', 'wb') as f:
@@ -174,7 +177,7 @@ class MultiWorld(MazeWorld):
 
         for t in range(t_step):
             a = agent.predict_a(s)
-            s = self.act(s, list(self.actions.keys())[a])
+            s = agent.predict_s(s, a)#self.act(s, list(self.actions.keys())[a])
             traj.append(self._index_to_cell(s))
 
         return traj
@@ -193,7 +196,7 @@ class MultiWorld(MazeWorld):
             im = ax.pcolor(G, vmin=vmin, vmax=vmax, cmap=cmap)
         else:
             im = ax.pcolor(G, cmap=cmap)
-        fig.colorbar(im, ax=ax)
+        #fig.colorbar(im, ax=ax)
         if pos is not None:
             ax.scatter([pos[1] + 0.5], [pos[0] + 0.5], s = 100, c = 'w')
         # plot trajectory

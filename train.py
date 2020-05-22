@@ -28,7 +28,7 @@ def train_agent(B, E, agent, w, n_s, n_a, randomize=False):
         visited[pos[0], pos[1]] += 1
     return D_emp, D_mod, steps, tau, visited
 
-def train_ma_agent(B, E, brain, w, n_s, n_a, randomize=False):
+def train_ma_agent(B, E, brain, w, n_s, n_a, randomize=True):
     steps = int(100000)
     visited = np.zeros(w.dims)
     visited_config = np.zeros(n_s)
@@ -41,19 +41,16 @@ def train_ma_agent(B, E, brain, w, n_s, n_a, randomize=False):
 
     for t in range(steps):
         if not randomize:
-            a = brain.act(c)
-            s_ = [w.act(agent.s, w.a_list[a][i]) for i, agent in enumerate(w.agents)]
-            s_ = s_ if len(set(s_)) == len(w.agents) else [w._index_to_location(c, i) for i, agent in enumerate(w.agents)]
-            c_ = w._location_to_index(s_)
-            for i, agent in enumerate(w.agents):
-                agent.set_s(s_[i])
+            c_ = w.interact(c)
         else:
             c = np.random.randint(n_s)
             a = brain.act(c)
             c_ = np.argmax(w.T[:, a, c])
+            for agent in w.agents:
+                agent.brain.update(c, a, c_)
 
         if t%100==0:print(f'maxV = {np.max(brain.value_map)} minV= {np.min(brain.value_map)} at progress={t/steps*100}%')
-        brain.update(c, a, c_)
+
         c = c_
         # append data for plotting
         tau[t] = brain.tau
@@ -66,3 +63,5 @@ def train_ma_agent(B, E, brain, w, n_s, n_a, randomize=False):
         visited_config[c_] += 1
 
     return D_emp, D_mod, steps, tau, visited, visited_config
+
+

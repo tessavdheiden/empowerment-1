@@ -23,6 +23,30 @@ class SocialWorld(MultiWorld):
         self.agents.append(agent)
         self.n_a = len(self.agents)
 
+    def interact(self, c, det=1.):
+        """ Computes new configuration if no collisions.
+        """
+        a_lst = [agent.decide(c) for agent in self.agents]  # [0, 1]
+        action_lst = [self.a_list[a][i] for i, a in enumerate(a_lst)]  # [('N', 'N'), ('N', 'S')] --> ['N','S']
+        a = np.argmax(np.array([x[0] == action_lst[0] and x[1] == action_lst[1] for x in self.a_list]))  # [1]
+        s_ = [self.act(agent.s, action) for agent, action in zip(self.agents, action_lst)]
+
+        # collision
+        if len(set(s_)) < self.n_a:
+            s_ = [self._index_to_location(c, i) for i in range(self.n_a)]
+
+        c_ = self._location_to_index(s_)
+        for i, agent in enumerate(self.agents):
+            agent.set_s(s_[i])
+            agent.set_a(a)
+            agent.set_action(action_lst[i])
+
+        # update Q functions
+        for i, agent in enumerate(self.agents):
+            agent.rewire(c, a, c_)
+
+        return c_
+
 
 from world.mazeworld import WorldFactory
 
@@ -35,7 +59,7 @@ class SocialWorldFactory(WorldFactory):
         emptymaze = self.create_maze_world(height=maze.height, width=maze.width)
         T = emptymaze.compute_ma_transition(2, det=1)
         maze.add_social_agent([0, 1], '_', T)
-        maze.add_social_agent([1, 0], 'E', T)
+        maze.add_social_agent([0, 0], 'E', T)
         return maze
 
     def door2_2agents(self):
