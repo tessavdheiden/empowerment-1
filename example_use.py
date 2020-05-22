@@ -218,43 +218,43 @@ def example_5():
 
 def example_6():
     """ Runs empowerment maximising agent running in a chosen grid world """
-    np.random.seed(1)
+    np.random.seed(2)
     # maze
     n_step = 1
     f = SocialWorldFactory()
-    w = f.klyubin_world_2agents()
+    w = f.simple_2agents()
     B = w.compute_ma_transition(2)
     strategy = VisitCountFast()
     E = strategy.compute(world=w, T=B, n_step=n_step).reshape(-1)
-
-    initpos = [1,3] # np.random.randint(w.dims[0], size=2)
-    s = w._cell_to_index(initpos)
 
     # for reference
     n_s, n_a, _ = B.shape
 
     # agent
-    agent = w.agents[0].brain
+    w.agents[0].load_params()
+    brain = w.agents[0].brain
+    brain.decay = 5e-5
 
     # training loop
     start = time.time()
-    D_emp, D_mod, steps, tau, visited, visited_config = train_ma_agent(B, E, agent, w, n_s, n_a)
+    D_emp, D_mod, steps, tau, visited, visited_config = train_ma_agent(B, E, brain, w, n_s, n_a, True)
+    w.agents[0].save_params()
 
     print("elapsed seconds: %0.3f" % (time.time() - start) )
     # some plotting
     fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(9, 6))
 
-    w.plot(fig, ax[0, 0], colorMap= agent.E.reshape(w.dims[0], -1))
+    w.plot(fig, ax[0, 0], colorMap= brain.E.reshape(w.dims[0], -1))
     ax[0, 0].set_title('subjective empowerment')
-    print(f'min = {np.min(agent.E):.2f}, max = {np.max(agent.E):.2f}')
+    print(f'min = {np.min(brain.E):.2f}, max = {np.max(brain.E):.2f}')
 
     w.plot(fig, ax[0,1], colorMap=visited.reshape(w.dims[0], -1))
     ax[0, 1].set_title('visited')
 
-    w.plot(fig, ax[0,2], colorMap=agent.value_map.reshape(w.dims[0], -1))
+    w.plot(fig, ax[0,2], colorMap=brain.value_map.reshape(w.dims[0], -1))
     ax[0, 2].set_title('value map')
 
-    ax[1, 0].scatter(agent.E, visited_config.reshape(n_s))
+    ax[1, 0].scatter(brain.E, visited_config.reshape(n_s))
     ax[1, 0].set_xlabel('true empowerment')
     ax[1, 0].set_ylabel('visit frequency')
 
@@ -275,7 +275,7 @@ def example_6():
     w.plot(fig, ax[2, 0], colorMap= E.reshape(w.dims[0], -1))
     ax[2, 0].set_title('true empowerment')
 
-    Vmap = agent.value_map
+    Vmap = brain.value_map
     idx = np.argsort(Vmap)
     for j, agent in enumerate(w.agents):
         agent.s = w._index_to_location(idx[0], j)

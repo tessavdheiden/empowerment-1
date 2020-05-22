@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import math
+import pickle
 import itertools
 
 
@@ -45,6 +46,20 @@ class Agent(object):
 
     def predict_a(self, s):
         return self.brain.action_map[s]
+
+    def save_params(self):
+        params = dict(vars(self.brain))
+        with open('params.pkl', 'wb') as f:
+            pickle.dump(params, f)
+
+    def load_params(self):
+        with open('params.pkl', 'rb') as f:
+            params = pickle.load(f)
+
+        self.brain.T = params.get('T')
+        self.brain.Q = params.get('Q')
+        self.brain.R = params.get('R')
+        self.brain.tau = params.get('tau')
 
 
 class MultiWorld(MazeWorld):

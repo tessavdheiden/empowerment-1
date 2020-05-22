@@ -29,7 +29,7 @@ def train_agent(B, E, agent, w, n_s, n_a, randomize=False):
     return D_emp, D_mod, steps, tau, visited
 
 def train_ma_agent(B, E, brain, w, n_s, n_a, randomize=False):
-    steps = int(10000)
+    steps = int(100000)
     visited = np.zeros(w.dims)
     visited_config = np.zeros(n_s)
     tau = np.zeros(steps)
