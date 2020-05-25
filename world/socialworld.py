@@ -12,10 +12,10 @@ class SocialWorld(MultiWorld):
     def __init__(self, height, width, toroidal = False):
         super().__init__(height, width, toroidal)
 
-    def add_social_agent(self, cell, action, T):
+    def add_social_agent(self, cell, action, T, det):
         cell = np.array(cell)
         T = copy.deepcopy(T)
-        agent = Agent(T=T, det=1)
+        agent = Agent(T=T, det=det)
         agent.set_cell(cell)
         agent.set_s(self._cell_to_index(cell))
         agent.set_action(action)
@@ -73,25 +73,28 @@ class SocialWorldFactory(WorldFactory):
 
     def simple_2agents(self):
         maze = self.simple()
+        det = .9
         emptymaze = self.create_maze_world(height=maze.height, width=maze.width)
-        T = emptymaze.compute_ma_transition(2, det=1)
-        maze.add_social_agent([0, 1], '_', T)
-        maze.add_social_agent([0, 0], 'E', T)
+        T = emptymaze.compute_ma_transition(2, det=det)
+        maze.add_social_agent([0, 1], '_', T, det)
+        maze.add_social_agent([0, 0], 'E', T, det)
         return maze
 
     def door2_2agents(self):
         maze = self.door2_world()
+        det = 1.
         emptymaze = self.create_maze_world(height=maze.height, width=maze.width)
-        T = emptymaze.compute_ma_transition(2, det=1)
-        maze.add_social_agent([1, 3], '_', T)
-        maze.add_social_agent([4, 3], 'E', T)
+        T = emptymaze.compute_ma_transition(2, det=det)
+        maze.add_social_agent([1, 3], '_', T, det)
+        maze.add_social_agent([4, 3], 'E', T, det)
         return maze
 
     def klyubin_world_2agents(self):
         maze = self.klyubin_world()
+        det = 1
         emptymaze = self.create_maze_world(height=maze.height, width=maze.width)
-        T = emptymaze.compute_ma_transition(2, det=1)
-        maze.add_social_agent([1, 3], '_', T)
-        maze.add_social_agent([4, 3], 'E', T)
+        T = emptymaze.compute_ma_transition(2, det=det)
+        maze.add_social_agent([1, 3], '_', T, det)
+        maze.add_social_agent([4, 3], 'E', T,det)
         return maze
 

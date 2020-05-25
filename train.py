@@ -41,6 +41,7 @@ def train_ma_agent(B, E, brain, w, n_s, n_a, randomize=False):
 
     for t in range(steps):
         if not randomize:
+            if t % 100 == 0: c = np.argmin(visited_config) # avoid overestimating unvisited
             c_ = w.interact(c)
         else:
             c = np.random.randint(n_s)

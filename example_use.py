@@ -313,9 +313,10 @@ def example_7():
         traj = w.predict_trajectory(w.agents[0], 4)
         w.plot(fig, ax)
         w.plot_entities(fig, ax)
-        ax.plot(traj[:, 0, 1]+.5, traj[:, 0, 0]+.5, c='b')
-        ax.plot(traj[:, 1, 1] + .5, traj[:, 1, 0] + .5, c='r')
-        ax.set_title(f'a0={w.agents[0].brain.value_map[c]:.2f}')
+        for i in range(w.n_a):
+            ax.plot(traj[:, i, 1]+.5, traj[:, i, 0]+.5)
+            ax.text(traj[0, i, 1]+.5, traj[0, i, 0]+.5, f'{w.agents[i].brain.value_map[c_]:.0f}')
+
         plt.pause(1)
         c = c_
 
@@ -329,4 +330,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_7()
+    example_6()
