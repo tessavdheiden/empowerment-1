@@ -121,8 +121,6 @@ class VariationalEmpowermentContinuous(EmpowermentStrategy):
             s = s_all[torch.randperm(s_all.size()[0])].view(-1, 1)
 
             c = self._index_to_cell(s, h, w)
-
-
             a, p_source = self.source.forward(c, temp)
 
             s_ = self._propagate_state(Bn, s, a).max(1)[1].view(-1, 1)

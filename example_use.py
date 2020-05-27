@@ -168,7 +168,7 @@ def example_3():
     strategy.train_batch(world=w, T=T, n_step=n_step)
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 0], colorMap=E.reshape(w.dims))
-    ax[1, 0].set_title(f'{n_step}-step Variational {time.time() - start:.2f}s')
+    ax[1, 0].set_title(f'{n_step}-step continuous VE {time.time() - start:.2f}s')
 
     # 3 step variational
     n_step = 3
@@ -177,7 +177,7 @@ def example_3():
     strategy.train_batch(world=w, T=T, n_step=n_step)
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 1], colorMap=E.reshape(w.dims))
-    ax[1, 1].set_title(f'{n_step}-step Variational {time.time() - start:.2f}s')
+    ax[1, 1].set_title(f'{n_step}-step continuous VE {time.time() - start:.2f}s')
 
     # different scene
     w = f.simple()
@@ -188,7 +188,38 @@ def example_3():
     strategy.train_batch(world=w, T=T, n_step=n_step)
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 2], colorMap=E.reshape(w.dims))
-    ax[1, 2].set_title(f'{n_step}-step Variational {time.time() - start:.2f}s')
+    ax[1, 2].set_title(f'{n_step}-step continuous VE {time.time() - start:.2f}s')
+
+    # Variational empowerment
+    w = f.create_maze_world(6, 3)
+    n_step = 1
+    T = w.compute_transition()
+    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    start = time.time()
+    strategy.train_batch(world=w, T=T, n_step=n_step)
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[2, 0], colorMap=E.reshape(w.dims))
+    ax[2, 0].set_title(f'{n_step}-step VE {time.time() - start:.2f}s')
+
+    # 3 step variational
+    n_step = 3
+    start = time.time()
+    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    strategy.train_batch(world=w, T=T, n_step=n_step)
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[2, 1], colorMap=E.reshape(w.dims))
+    ax[2, 1].set_title(f'{n_step}-step VE {time.time() - start:.2f}s')
+
+    # different scene
+    w = f.simple()
+    n_step = 1
+    T = w.compute_transition()
+    start = time.time()
+    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    strategy.train_batch(world=w, T=T, n_step=n_step)
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[2, 2], colorMap=E.reshape(w.dims))
+    ax[2, 2].set_title(f'{n_step}-step VE {time.time() - start:.2f}s')
 
     fig.tight_layout()
 
