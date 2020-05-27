@@ -42,4 +42,5 @@ class World(object):
         Bn = np.zeros([n_states, len(nstep_actions), n_states])
         for i, an in enumerate(nstep_actions):
             Bn[:, i, :] = reduce((lambda x, y: np.dot(y, x)), map((lambda a: self.T[:, a, :]), an))
+        self.Bn = Bn
         return Bn

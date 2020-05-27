@@ -49,8 +49,7 @@ class Planner(nn.Module):
 class VariationalEmpowerment(EmpowermentStrategy):
     max_grad_norm = .5
     temp_min = 1
-    anneal_rate = 3e-7
-    temp = 1.
+    temp = 15.
 
     def __init__(self, n_s, n_a, n_step):
         self.input_dim = n_s
@@ -62,77 +61,80 @@ class VariationalEmpowerment(EmpowermentStrategy):
         self.action_list = torch.from_numpy(np.arange(n_a**n_step)).float().view(1, -1).to(device)
 
     def compute(self, world, T, n_step, n_samples=int(1e3)):
-        n_states, _, _ = T.shape
-        Bn = world.compute_nstep_transition_model(n_step)
-        _, n_actionseq, _ = Bn.shape
 
-        T = torch.from_numpy(Bn).float().to(device)
+        Bn = torch.from_numpy(world.Bn).float().to(device)
+        n_s, n_aseq, _ = Bn.shape
 
-        S = torch.arange(n_states).view(-1, 1).to(device)
-        S_hot = one_hot_batch_matrix(S, n_states).to(device).float()
+        s = torch.arange(n_s).view(-1, 1).to(device)
+        s_hot = self._index_to_one_hot(s, n_s).to(device).float()
         avg = torch.zeros(world.dims).to(device)
-        n_samples = max(n_samples, n_states*n_actionseq)
+        n_samples = max(n_samples, n_s*n_aseq)
 
         for _ in range(n_samples):
             with torch.no_grad():
-                z, prob = self.source.forward(S_hot)
-                s_ = get_s_next_from_s_batch_matrix(T, S, z)
-                prob_ = self.planner.forward(S_hot, s_)
-                avg += (torch.mul(prob_, z.detach()).sum(1) - torch.mul(prob, z).sum(1)).view(world.dims)
+                z, p_source = self.source.forward(s_hot)
+                s_ = self._propagate_state(Bn, s, z)
+                prob_planner = self.planner.forward(s_hot, s_)
+                avg += (torch.mul(prob_planner, z.detach()).sum(1) - torch.mul(p_source, z).sum(1)).view(world.dims)
 
         E = avg / n_samples #torch.log2(avg / n_samples)
-        self.q_x = prob.transpose(1, 0).cpu().numpy()
+        #self.q_x = prob.transpose(1, 0).cpu().numpy()
         return E.cpu().numpy()
 
-    def _index_to_cell(self, s, height, width):
-        cell = torch.stack([s // width, s % width], dim=1).float()
-        return cell.squeeze(2)
+    def _index_to_one_hot(self, x, input_dim):
+        return torch.nn.functional.one_hot(x, num_classes=input_dim).view(x.shape[0], input_dim)
 
-    def train_batch(self, world, T, n_step, n_samples=int(5e4)):
+    def _propagate_state(self, T, s, z):
+        n_s, n_a, _ = T.shape
+        n_b, _ = s.shape
+        t = T.view(1, n_s * n_a, n_s).repeat(n_b, 1, 1)
+        batch = t.gather(-1, s.view(-1, 1, 1).repeat(1, n_a * n_s, 1)).view(n_b, n_s, n_a).float()
+        z = z.view(n_b, n_a, 1)
+
+        out = torch.bmm(batch, z.float())  # out = [n_b, n_s, 1]
+        return out.squeeze(2)
+
+    def train_batch(self, world, T, n_step, n_samples=int(2.5e3)):
         """
          Compute the empowerment of a grid world with neural networks
          See eq 3 and 5 of https: // arxiv.org / pdf / 1710.05101.pdf
          """
-        n_states, n_actions, _ = T.shape
-        Bn = world.compute_nstep_transition_model(n_step=n_step)
+        n_s, n_a, _ = T.shape
+        Bn = torch.from_numpy(world.compute_nstep_transition_model(n_step=n_step)).float().to(device)
 
-        T = torch.from_numpy(Bn).float().to(device)
-        states = torch.arange(n_states).view(-1, 1).to(device)
+        s_all = torch.arange(n_s).view(-1, 1).to(device)
+
+        anneal_rate = -np.log(self.temp) / n_samples
         start = time.time()
         for i in range(n_samples):
-            if i % 100 == 0 and i != 0: self.temp = np.maximum(self.temp * np.exp(-self.anneal_rate * i), self.temp_min)
-            S = states[torch.randperm(states.size()[0])]
-            S_hot = one_hot_batch_matrix(S, self.input_dim).float()
-            Z, prob = self.source.forward(S_hot.float(), self.temp)
+            temp = self.temp * np.exp( anneal_rate * i)
+            s = s_all[torch.randperm(s_all.size()[0])]
 
-            S_ = get_s_next_from_s_batch_matrix(T, S, Z)
-            prob_ = self.planner.forward(S_hot, S_.detach())
+            s_hot = self._index_to_one_hot(s, self.input_dim).float()
+            z, p_source = self.source.forward(s_hot.float(), temp)
+
+            s_ = self._propagate_state(Bn, s, z)
+            prob_planner = self.planner.forward(s_hot, s_.detach())
 
             self.optimizer.zero_grad()
-            error = -torch.mul(prob_, Z.detach()).sum(1) + torch.mul(prob, Z).sum(1)
+            error = -torch.mul(prob_planner, z.detach()).sum(1) + torch.mul(p_source, z).sum(1)
             loss = error.mean()
             loss.backward()
             nn.utils.clip_grad_norm_(self.params, self.max_grad_norm)
             self.optimizer.step()
 
-            if i % 10000 == 0:
-                print(f"elapsed seconds: {time.time() - start:0.3f}, temp = {self.temp}")
+            if i % 100 == 0:
+                print(f"elapsed seconds: {time.time() - start:0.3f}, temp = {temp}, progress = {i/n_samples*100:.2f}%")
                 start = time.time()
                 E = self.compute(world, T, n_step)
                 (fig, ax) = plt.subplots(1)
-                world.plot(colorMap=E, figax=(fig, ax))
-                #self.plot(world.width, world.height)
+                world.plot(fig, ax, colorMap=E)
                 plt.savefig(f"results/{i}.png")
                 plt.close(fig)
 
 
 def one_hot_vector(x, input_dim):
     return torch.zeros(1, input_dim).scatter_(1, x.view(-1, 1), 1)
-
-
-def one_hot_batch_matrix(x, input_dim):
-    return torch.nn.functional.one_hot(x, num_classes=input_dim).view(x.shape[0], input_dim)
-
 
 def get_s_next_from_one_hot(T, s_hot, z):
     assert s_hot.shape[1] > 1
@@ -163,15 +165,7 @@ def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
     return out.squeeze(2)
 
 
-def get_s_next_from_s_batch_matrix(T, s, z):
-    n_s, n_a, _ = T.shape
-    n_b, _ = s.shape
-    t = T.view(1, n_s * n_a, n_s).repeat(n_b, 1, 1)
-    batch = t.gather(-1, s.view(-1, 1, 1).repeat(1, n_a * n_s, 1)).view(n_b, n_s, n_a).float()
-    z = z.view(n_b, n_a, 1)
 
-    out = torch.bmm(batch, z.float()) # out = [n_b, n_s, 1]
-    return out.squeeze(2)
 
 
 

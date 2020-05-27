@@ -12,8 +12,9 @@ class VETest(unittest.TestCase):
         self.assertTrue(torch.all(y.eq(r)))
 
     def test_one_hot_batch(self):
+        ve = VariationalEmpowerment(n_s=3, n_a=4, n_step=1)
         t = torch.tensor([[1], [3], [1]])
-        y = one_hot_batch_matrix(t, 4)
+        y = ve._index_to_one_hot(t, 4)
         r = torch.tensor([[0, 1, 0, 0], [0, 0, 0, 1], [0, 1, 0, 0]])
         self.assertTrue(torch.all(y.eq(r)))
 
@@ -29,10 +30,11 @@ class VETest(unittest.TestCase):
         self.assertTrue(torch.all(s_.eq(r)))
 
     def test_get_s_next_s_hot_batch(self):
+        ve = VariationalEmpowerment(n_s=6, n_a=3, n_step=1)
         batch_size = 32
         T = torch.tensor([[[0, 0, 0], [1, 1, 0]], [[1, 0, 0], [0, 0, 1]], [[0, 1, 1], [0, 0, 0]]])
         s = torch.tensor([1]).long().view(-1, 1).repeat(batch_size, 1)
-        s_hot = one_hot_batch_matrix(s, 3)
+        s_hot = ve._index_to_one_hot(s, 3)
         z = torch.tensor([[1, 0]]).repeat(batch_size, 1)
         s_ = get_s_next_from_one_hot_batch_matrix(T, s_hot, z)
         r = torch.tensor([0, 0, 1])
@@ -41,11 +43,12 @@ class VETest(unittest.TestCase):
 
     def test_get_s_next_s_batch(self):
         batch_size = 32
+        ve = VariationalEmpowerment(n_s=6, n_a=3, n_step=1)
         T = torch.tensor([[[0, 0, 0], [1, 1, 0]], [[1, 0, 0], [0, 0, 1]], [[0, 1, 1], [0, 0, 0]]])
         s = torch.tensor([1]).long().view(-1, 1).repeat(batch_size, 1)
         #s_hot = one_hot_batch_matrix(s, 3)
         z = torch.tensor([[1, 0]]).repeat(batch_size, 1)
-        s_ = get_s_next_from_s_batch_matrix(T, s, z)
+        s_ = ve._propagate_state(T, s, z)
         r = torch.tensor([0, 0, 1])
         self.assertTrue(torch.all(s_[0].eq(r)))
         self.assertTrue(torch.all(s_[-1].eq(r)))
