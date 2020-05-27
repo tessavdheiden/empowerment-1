@@ -128,18 +128,70 @@ def example_2():
 
 def example_3():
     """ compute empowerment landscape with neural networks"""
-    maze = MazeWorld(5, 5)
+    fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(9, 9))
+    f = WorldFactory()
+    w = f.create_maze_world(6, 3)
+
+    # Blahut as benchmark
+    n_step = 1
+    T = w.compute_transition()
+    strategy = BlahutArimoto()
+
+    start = time.time()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[0, 0], colorMap=E.reshape(w.dims))
+    ax[0,0].set_title(f'{n_step}-step Blahut Arimoto {time.time() - start:.2f}s')
+
+    # 3 step Blahut
     n_step = 3
     start = time.time()
-    T = maze.compute_transition()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[0, 1], colorMap=E.reshape(w.dims))
+    ax[0, 1].set_title(f'{n_step}-step Blahut Arimoto {time.time() - start:.2f}s')
+
+    # different scene
+    w = f.simple()
+    n_step = 1
+    T = w.compute_transition()
+    start = time.time()
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[0, 2], colorMap=E.reshape(w.dims))
+    ax[0, 2].set_title(f'{n_step}-step Blahut Arimoto {time.time() - start:.2f}s')
+
+    # Variational empowerment
+    w = f.create_maze_world(6, 3)
+    n_step = 1
+    T = w.compute_transition()
     strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
-    strategy = BlahutArimoto()
-    #strategy.train_batch(world=maze, T=T, n_step=n_step)
-    E = strategy.compute(world=maze, T=T, n_step=n_step)
-    print(f"elapsed seconds: {time.time() - start:0.3f}")
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(7, 5))
-    maze.plot(fig, ax, colorMap=E.reshape(maze.dims))
-    ax.set_title('%i-step empowerment' % n_step)
+    start = time.time()
+    strategy.train_batch(world=w, T=T, n_step=n_step)
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[1, 0], colorMap=E.reshape(w.dims))
+    ax[1, 0].set_title(f'{n_step}-step Variational {time.time() - start:.2f}s')
+
+    # 3 step variational
+    n_step = 3
+    start = time.time()
+    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    strategy.train_batch(world=w, T=T, n_step=n_step)
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[1, 1], colorMap=E.reshape(w.dims))
+    ax[1, 1].set_title(f'{n_step}-step Variational {time.time() - start:.2f}s')
+
+    # different scene
+    w = f.simple()
+    n_step = 1
+    T = w.compute_transition()
+    start = time.time()
+    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    strategy.train_batch(world=w, T=T, n_step=n_step)
+    E = strategy.compute(world=w, T=T, n_step=n_step)
+    w.plot(fig, ax[1, 2], colorMap=E.reshape(w.dims))
+    ax[1, 2].set_title(f'{n_step}-step Variational {time.time() - start:.2f}s')
+
+    fig.tight_layout()
+
+
     plt.show()
     #plt.savefig("results/finalE.png")
 
@@ -307,7 +359,7 @@ def example_7():
     s = [agent.s for agent in w.agents]
     c = w._location_to_index(s)
 
-    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(4, 4))
+    fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(2, 4))
     for _ in range(100):
         c_ = w.interact(c, eval=True)
         traj = w.predict_trajectory(w.agents[0], 4)
@@ -330,4 +382,4 @@ if __name__ == "__main__":
     # example_2()
     # example_3()
     # example_4()
-    example_6()
+    example_3()

@@ -133,36 +133,6 @@ class VariationalEmpowerment(EmpowermentStrategy):
                 plt.close(fig)
 
 
-def one_hot_vector(x, input_dim):
-    return torch.zeros(1, input_dim).scatter_(1, x.view(-1, 1), 1)
-
-def get_s_next_from_one_hot(T, s_hot, z):
-    assert s_hot.shape[1] > 1
-    t = (T * s_hot.float()).sum(2)
-    return torch.mm(t, z.float().T).T
-
-
-def get_s_next(T, s, z):
-    assert s.shape[1] == 1
-    idx = s.unsqueeze(0).repeat(T.shape[0], T.shape[1], 1)
-    t = T[:, :, :].gather(2, idx)
-    return torch.mm(t.squeeze(2), z.T).T
-
-
-def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
-    assert s_hot.shape[0] > 1 and z.shape[0] > 1
-    n_s, n_a, _ = T.shape
-    n_b, _ = s_hot.shape
-    t = T.view(-1, n_s * n_a, n_s)
-    t = t.repeat(n_b, 1, 1)
-    s_hot = s_hot.view(n_b, n_s, 1)
-
-    batch = torch.bmm(t.float(), s_hot.float()) # out = [n_b, n_s * n_a, 1]
-    batch = batch.squeeze(2).view(n_b, n_s, n_a)
-    z = z.view(n_b, n_a, 1)
-
-    out = torch.bmm(batch, z.float()) # out = [n_b, n_s, 1]
-    return out.squeeze(2)
 
 
 
