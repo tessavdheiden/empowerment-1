@@ -84,21 +84,27 @@ class VariationalEmpowerment(EmpowermentStrategy):
     def _index_to_one_hot(self, x, input_dim):
         return torch.nn.functional.one_hot(x, num_classes=input_dim).view(x.shape[0], input_dim)
 
-    def _propagate_state(self, T, s, z):
+    def _propagate_state(self, T, s, a):
+        """ get updated state after action a
+        s : batch of states, with each state being the index of grid position
+        a : action sequence, implemented as one hot
+        T : Transition matrix, starting in s, taking action sequence a, probability of reaching s' T(s', a, s)
+        """
         n_s, n_a, _ = T.shape
         n_b, _ = s.shape
-        t = T.view(1, n_s * n_a, n_s).repeat(n_b, 1, 1)
-        batch = t.gather(-1, s.view(-1, 1, 1).repeat(1, n_a * n_s, 1)).view(n_b, n_s, n_a).float()
-        z = z.view(n_b, n_a, 1)
+        T_rep = T.view(1, n_s * n_a, n_s).repeat(n_b, 1, 1)
+        s_rep = s.view(-1, 1, 1).repeat(1, n_a * n_s, 1)
+        batch = T_rep.gather(-1, s_rep).view(n_b, n_s, n_a).float()
+        a = a.view(n_b, n_a, 1)
 
-        out = torch.bmm(batch, z.float())  # out = [n_b, n_s, 1]
+        out = torch.bmm(batch, a.float())  # out = [n_b, n_s, 1]
         return out.squeeze(2)
 
     def train_batch(self, world, T, n_step, n_samples=int(2.5e3)):
         """
-         Compute the empowerment of a grid world with neural networks
-         See eq 3 and 5 of https: // arxiv.org / pdf / 1710.05101.pdf
-         """
+        Compute the empowerment of a grid world with neural networks
+        See eq 3 and 5 of https: // arxiv.org / pdf / 1710.05101.pdf
+        """
         n_s, n_a, _ = T.shape
         Bn = torch.from_numpy(world.compute_nstep_transition_model(n_step=n_step)).float().to(device)
 
@@ -111,13 +117,13 @@ class VariationalEmpowerment(EmpowermentStrategy):
             s = s_all[torch.randperm(s_all.size()[0])]
 
             s_hot = self._index_to_one_hot(s, self.input_dim).float()
-            z, p_source = self.source.forward(s_hot.float(), temp)
+            a, p_source = self.source.forward(s_hot.float(), temp)
 
-            s_ = self._propagate_state(Bn, s, z)
+            s_ = self._propagate_state(Bn, s, a)
             prob_planner = self.planner.forward(s_hot, s_.detach())
 
             self.optimizer.zero_grad()
-            error = -torch.mul(prob_planner, z.detach()).sum(1) + torch.mul(p_source, z).sum(1)
+            error = -torch.mul(prob_planner, a.detach()).sum(1) + torch.mul(p_source, a).sum(1)
             loss = error.mean()
             loss.backward()
             nn.utils.clip_grad_norm_(self.params, self.max_grad_norm)

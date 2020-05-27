@@ -6,6 +6,7 @@ from strategy.empowerment import BlahutArimoto, VisitCount, VisitCountFast, Blah
 from agent import EmpMaxAgent
 from train import train_ma_agent, train_agent
 from strategy.variational_empowerment import VariationalEmpowerment
+from strategy.variational_empowerment_continuous import VariationalEmpowermentContinuous
 import numpy as np 
 import matplotlib.pyplot as plt
 import time 
@@ -128,7 +129,7 @@ def example_2():
 
 def example_3():
     """ compute empowerment landscape with neural networks"""
-    fig, ax = plt.subplots(nrows=2, ncols=3, figsize=(9, 9))
+    fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(9, 9))
     f = WorldFactory()
     w = f.create_maze_world(6, 3)
 
@@ -162,7 +163,7 @@ def example_3():
     w = f.create_maze_world(6, 3)
     n_step = 1
     T = w.compute_transition()
-    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
     start = time.time()
     strategy.train_batch(world=w, T=T, n_step=n_step)
     E = strategy.compute(world=w, T=T, n_step=n_step)
@@ -172,7 +173,7 @@ def example_3():
     # 3 step variational
     n_step = 3
     start = time.time()
-    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
     strategy.train_batch(world=w, T=T, n_step=n_step)
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 1], colorMap=E.reshape(w.dims))
@@ -183,7 +184,7 @@ def example_3():
     n_step = 1
     T = w.compute_transition()
     start = time.time()
-    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
+    strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
     strategy.train_batch(world=w, T=T, n_step=n_step)
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 2], colorMap=E.reshape(w.dims))
@@ -347,7 +348,6 @@ def example_6():
 
     print(f'min = {np.min(Vmap):.2f}, max = {np.max(Vmap):.2f}')
     plt.show()
-
 
 def example_7():
     f = SocialWorldFactory()

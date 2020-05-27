@@ -2,7 +2,7 @@ import unittest
 import torch
 
 from strategy.variational_empowerment import *
-from strategy.variational_empowerment_continues import *
+from strategy.variational_empowerment_continuous import *
 
 class VETest(unittest.TestCase):
     def test_index_to_one_hot(self):
@@ -35,6 +35,19 @@ class VETest(unittest.TestCase):
         r = torch.tensor([0, 0, 1])
         self.assertTrue(torch.all(s_[0].eq(r)))
         self.assertTrue(torch.all(s_[-1].eq(r)))
+
+    def test_index_to_cell(self):
+        ve = VariationalEmpowermentContinuous(n_s=6, n_a=3, n_step=1)
+        batch_size = 10
+        h, w = 3, 4
+        n_s = int(w*h)
+        s = torch.randint(0, n_s, (batch_size,)).view(-1, 1)
+        c = ve._index_to_cell(s, h, w)
+        self.assertTrue(torch.all(c[:, 0] < h))
+        self.assertTrue(torch.all(c[:, 1] < w))
+        self.assertEqual(c.shape[0], batch_size)
+        self.assertEqual(c.shape[1], 2)
+
 
 def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
     assert s_hot.shape[0] > 1 and z.shape[0] > 1
