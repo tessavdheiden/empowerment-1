@@ -158,7 +158,7 @@ def example_3():
     T = w.compute_transition()
     strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
     start = time.time()
-    strategy.train_batch(world=w, T=T, n_step=n_step)
+    strategy.train_batch(world=w, T=T, n_step=n_step, n_samples=int(1e3))
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 0], colorMap=E.reshape(w.dims))
     #strategy.plot(fig, ax[1, 0], states=np.arange(w.dims[0]*w.dims[1]), world=w, n_step=n_step)
@@ -169,15 +169,15 @@ def example_3():
     n_step = 3
     start = time.time()
     strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
-    strategy.train_batch(world=w, T=T, n_step=n_step)
+    strategy.train_batch(world=w, T=T, n_step=n_step, n_samples=int(1e4))
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 1], colorMap=E.reshape(w.dims))
     ax[1, 1].set_title(f'{n_step}-step continuous VE {time.time() - start:.2f}s')
 
     fig.tight_layout()
 
-    plt.show()
-    #plt.savefig("results/finalE.png")
+    #plt.show()
+    plt.savefig("results/finalE.png")
 
 def example_4():
     """ compute combined empowerment landscapes for all agents in multi-agent scenario"""
