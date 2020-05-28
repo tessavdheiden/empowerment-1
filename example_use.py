@@ -129,9 +129,9 @@ def example_2():
 
 def example_3():
     """ compute empowerment landscape with neural networks"""
-    fig, ax = plt.subplots(nrows=3, ncols=3, figsize=(9, 9))
+    fig, ax = plt.subplots(nrows=3, ncols=2, figsize=(9, 9))
     f = WorldFactory()
-    w = f.create_maze_world(6, 3)
+    w = f.klyubin_world()
 
     # Blahut as benchmark
     n_step = 1
@@ -142,25 +142,18 @@ def example_3():
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[0, 0], colorMap=E.reshape(w.dims))
     ax[0,0].set_title(f'{n_step}-step Blahut Arimoto {time.time() - start:.2f}s')
+    #strategy.plot(fig, ax[0,0], states=np.arange(len(E)), world=w, n_step=n_step)
 
     # 3 step Blahut
     n_step = 3
     start = time.time()
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[0, 1], colorMap=E.reshape(w.dims))
+    #strategy.plot(fig, ax[0, 1], states=np.arange(len(E)), world=w, n_step=n_step)
     ax[0, 1].set_title(f'{n_step}-step Blahut Arimoto {time.time() - start:.2f}s')
 
-    # different scene
-    w = f.simple()
-    n_step = 1
-    T = w.compute_transition()
-    start = time.time()
-    E = strategy.compute(world=w, T=T, n_step=n_step)
-    w.plot(fig, ax[0, 2], colorMap=E.reshape(w.dims))
-    ax[0, 2].set_title(f'{n_step}-step Blahut Arimoto {time.time() - start:.2f}s')
-
     # Variational empowerment
-    w = f.create_maze_world(6, 3)
+    w = f.klyubin_world()
     n_step = 1
     T = w.compute_transition()
     strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
@@ -168,7 +161,9 @@ def example_3():
     strategy.train_batch(world=w, T=T, n_step=n_step)
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 0], colorMap=E.reshape(w.dims))
+    #strategy.plot(fig, ax[1, 0], states=np.arange(w.dims[0]*w.dims[1]), world=w, n_step=n_step)
     ax[1, 0].set_title(f'{n_step}-step continuous VE {time.time() - start:.2f}s')
+
 
     # 3 step variational
     n_step = 3
@@ -179,50 +174,7 @@ def example_3():
     w.plot(fig, ax[1, 1], colorMap=E.reshape(w.dims))
     ax[1, 1].set_title(f'{n_step}-step continuous VE {time.time() - start:.2f}s')
 
-    # different scene
-    w = f.simple()
-    n_step = 1
-    T = w.compute_transition()
-    start = time.time()
-    strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
-    strategy.train_batch(world=w, T=T, n_step=n_step)
-    E = strategy.compute(world=w, T=T, n_step=n_step)
-    w.plot(fig, ax[1, 2], colorMap=E.reshape(w.dims))
-    ax[1, 2].set_title(f'{n_step}-step continuous VE {time.time() - start:.2f}s')
-
-    # Variational empowerment
-    w = f.create_maze_world(6, 3)
-    n_step = 1
-    T = w.compute_transition()
-    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
-    start = time.time()
-    strategy.train_batch(world=w, T=T, n_step=n_step)
-    E = strategy.compute(world=w, T=T, n_step=n_step)
-    w.plot(fig, ax[2, 0], colorMap=E.reshape(w.dims))
-    ax[2, 0].set_title(f'{n_step}-step VE {time.time() - start:.2f}s')
-
-    # 3 step variational
-    n_step = 3
-    start = time.time()
-    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
-    strategy.train_batch(world=w, T=T, n_step=n_step)
-    E = strategy.compute(world=w, T=T, n_step=n_step)
-    w.plot(fig, ax[2, 1], colorMap=E.reshape(w.dims))
-    ax[2, 1].set_title(f'{n_step}-step VE {time.time() - start:.2f}s')
-
-    # different scene
-    w = f.simple()
-    n_step = 1
-    T = w.compute_transition()
-    start = time.time()
-    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
-    strategy.train_batch(world=w, T=T, n_step=n_step)
-    E = strategy.compute(world=w, T=T, n_step=n_step)
-    w.plot(fig, ax[2, 2], colorMap=E.reshape(w.dims))
-    ax[2, 2].set_title(f'{n_step}-step VE {time.time() - start:.2f}s')
-
     fig.tight_layout()
-
 
     plt.show()
     #plt.savefig("results/finalE.png")

@@ -64,5 +64,7 @@ def get_s_next_from_one_hot_batch_matrix(T, s_hot, z):
     out = torch.bmm(batch, z.float()) # out = [n_b, n_s, 1]
     return out.squeeze(2)
 
+
 if __name__ == "__main__":
     unittest.main()
+

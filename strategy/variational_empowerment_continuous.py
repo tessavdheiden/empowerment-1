@@ -5,6 +5,8 @@ import torch.optim as optim
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+from functools import reduce
+import itertools
 
 from strategy.empowerment_strategy import EmpowermentStrategy
 
@@ -69,7 +71,7 @@ class VariationalEmpowermentContinuous(EmpowermentStrategy):
         c = self._index_to_cell(s, h, w)
         #s_hot = self._index_to_one_hot(s, n_s).to(device).float()
         avg = torch.zeros(world.dims).to(device)
-        n_samples = max(n_samples, n_s*n_aseq)
+        #n_samples = max(n_samples, n_s*n_aseq)
 
         for _ in range(n_samples):
             with torch.no_grad():
@@ -138,11 +140,25 @@ class VariationalEmpowermentContinuous(EmpowermentStrategy):
             if i % 100 == 0:
                 print(f"elapsed seconds: {time.time() - start:0.3f}, temp = {temp}, progress = {i/n_samples*100:.2f}%")
                 start = time.time()
-                E = self.compute(world, T, n_step)
-                (fig, ax) = plt.subplots(1)
-                world.plot(fig, ax, colorMap=E)
-                plt.savefig(f"results/{i}.png")
-                plt.close(fig)
+                # E = self.compute(world, T, n_step)
+                # (fig, ax) = plt.subplots(1)
+                # world.plot(fig, ax, colorMap=E)
+                # plt.savefig(f"results/{i}.png")
+                # plt.close(fig)
+
+    def plot(self, fig, ax, states, world, n_step):
+
+        a_list = [''.join(tup) for tup in list(itertools.product(world.actions.keys(), repeat=n_step))]
+        h, w = world.dims
+        states = torch.from_numpy(states).reshape(-1, 1)
+        c = self._index_to_cell(states, h, w)
+        with torch.no_grad():
+            a, p_source = self.source.forward(c, temp=1)
+        a = a.max(1)[1].cpu().numpy()
+        for i, s in enumerate(states):
+            ax.text(c[i, 1] + .5, c[i, 0] + .5, a_list[a[i]], horizontalalignment='center', verticalalignment='center')
+
+
 
 
 

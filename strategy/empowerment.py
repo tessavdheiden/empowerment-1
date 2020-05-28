@@ -79,6 +79,14 @@ class BlahutArimoto(EmpowermentStrategy):
 
         return E
 
+    def plot(self, fig, ax, states, world, n_step):
+        a = np.argmax(self.q_x[:, states], 0)
+        a_list = [''.join(tup) for tup in list(itertools.product(world.actions.keys(), repeat=n_step))]
+        for i, s in enumerate(states):
+            c = world._index_to_cell(s)
+            ax.text(c[1] + .5, c[0] + .5, a_list[a[i]], horizontalalignment='center', verticalalignment='center')
+
+
 
 class VisitCount(EmpowermentStrategy):
     def compute(self, world, T, n_step, n_samples=1000):
