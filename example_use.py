@@ -6,7 +6,6 @@ from strategy.empowerment import BlahutArimoto, VisitCount, VisitCountFast, Blah
 from agent import EmpMaxAgent
 from train import train_ma_agent, train_agent
 from strategy.variational_empowerment import VariationalEmpowerment
-from strategy.variational_empowerment_continuous import VariationalEmpowermentContinuous
 import numpy as np 
 import matplotlib.pyplot as plt
 import time 
@@ -156,7 +155,7 @@ def example_3():
     w = f.klyubin_world()
     n_step = 1
     T = w.compute_transition()
-    strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
+    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
     start = time.time()
     strategy.train_batch(world=w, T=T, n_step=n_step, n_samples=int(1e3))
     E = strategy.compute(world=w, T=T, n_step=n_step)
@@ -168,7 +167,7 @@ def example_3():
     # 3 step variational
     n_step = 3
     start = time.time()
-    strategy = VariationalEmpowermentContinuous(T.shape[0], T.shape[1], n_step=n_step)
+    strategy = VariationalEmpowerment(T.shape[0], T.shape[1], n_step=n_step)
     strategy.train_batch(world=w, T=T, n_step=n_step, n_samples=int(1e4))
     E = strategy.compute(world=w, T=T, n_step=n_step)
     w.plot(fig, ax[1, 1], colorMap=E.reshape(w.dims))
