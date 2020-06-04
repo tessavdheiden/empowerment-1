@@ -25,12 +25,13 @@ This repository allows you to calculate empowerment and experiment with it in va
 This repo is an extension of the repo on empowerment [Chris Marais](https://github.com/Mchristos/empowerment)
 
 ### Multi-agent world
-In this example we reproduce the grid world presented in the original Klyubin paper on empowerment [1], and compute empowerment with two agents instead of one.
+In this example we reproduce the examples from [Chris Marais](https://github.com/Mchristos/empowerment), and compute empowerment with two or three agents instead of one.
 
+<img width="500" alt="" src="https://user-images.githubusercontent.com/24938569/83735101-32e9d080-a650-11ea-9e69-d91dae330295.png">
 
 ### Variational empowerment
 In this example we reproduce the grid world presented in the original Klyubin paper on empowerment [1], and compute empowerment with two neural networks.
 
-<img width="500" alt="" src="<img width="500" alt="" src="https://user-images.githubusercontent.com/24938569/83734622-8f002500-a64f-11ea-8dc7-5a600abe55b8.png">
+<img width="500" alt="" src="https://user-images.githubusercontent.com/24938569/83734622-8f002500-a64f-11ea-8dc7-5a600abe55b8.png">
 
 [1] Klyubin, A.S., Polani, D. and Nehaniv, C.L., 2005, September. All else being equal be empowered. In European Conference on Artificial Life (pp. 744-753). Springer, Berlin, Heidelberg.
